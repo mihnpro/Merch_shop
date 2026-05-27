@@ -2,10 +2,10 @@
 
 | | |
 |---|---|
-| **Версия** | 1.0.0 MVP |
-| **Стек** | Go · gRPC · Apache Kafka · Kubernetes · PostgreSQL · Redis |
+| **Версия** | 1.1.0 MVP |
+| **Стек** | Go · gRPC · Apache Kafka · Kubernetes · PostgreSQL · Redis · MinIO (S3) |
 | **Тип проекта** | Внутренний магазин мерча за корпоративные баллы |
-| **Архитектура** | Микросервисная (6 сервисов) |
+| **Архитектура** | Микросервисная (7 сервисов) |
 | **Срок** | 1 месяц |
 
 ---
@@ -15,164 +15,415 @@
 1. [Обзор и скоуп MVP](#1-обзор-и-скоуп-mvp)
 2. [Сервисы и ответственности](#2-сервисы-и-ответственности)
 3. [Полный сценарий покупки](#3-полный-сценарий-покупки)
-4. [gRPC API — все методы и связи](#4-grpc-api--все-методы-и-связи)
-5. [Kafka — событие order.created](#5-kafka--событие-ordercreated)
-6. [Схема данных по сервисам](#6-схема-данных-по-сервисам)
-7. [Структура репозитория](#7-структура-репозитория)
-8. [Kubernetes — деплой](#8-kubernetes--деплой)
-9. [Наблюдаемость](#9-наблюдаемость)
-10. [План реализации по неделям](#10-план-реализации-по-неделям)
-11. [Архитектурные решения (ADR)](#11-архитектурные-решения-adr)
-12. [Что вне MVP — план v2](#12-что-вне-mvp--план-v2)
+4. [Админка — управление и начисление баллов](#4-админка--управление-и-начисление-баллов)
+5. [Хранение фото — MinIO и presigned URL](#5-хранение-фото--minio-и-presigned-url)
+6. [gRPC API](#6-grpc-api)
+7. [Kafka — событие order.created](#7-kafka--событие-ordercreated)
+8. [Схема данных](#8-схема-данных)
+9. [Структура репозитория](#9-структура-репозитория)
+10. [Kubernetes — деплой](#10-kubernetes--деплой)
+11. [Наблюдаемость](#11-наблюдаемость)
+12. [План реализации по неделям](#12-план-реализации-по-неделям)
+13. [Архитектурные решения (ADR)](#13-архитектурные-решения-adr)
 
 ---
 
 ## 1. Обзор и скоуп MVP
 
-**Merch Store** — внутренняя платформа, где сотрудники могут заказывать корпоративный мерч (футболки, кружки, толстовки) за корпоративные баллы, которые начисляются за достижения, выслугу, KPI.
+**Merch Store** — внутренняя платформа, где сотрудники могут заказывать корпоративный мерч за баллы. Баллы начисляет HR через админ-панель (за достижения, бонусы, выслугу).
 
 ### 1.1 Что входит в MVP
 
-- Каталог товаров с фильтрами по категориям и размерам
+- Каталог товаров с фильтрами по категориям и размерам, с фото из S3
 - Корзина с TTL (24 часа)
 - Оформление заказа с проверкой остатков и баланса баллов
-- Резервирование остатков (защита от двойной продажи последней футболки)
-- Аутентификация через корпоративный SSO (JWT)
+- Резервирование остатков (защита от двойной продажи)
+- Аутентификация через корпоративный SSO (JWT с ролями `user` и `admin`)
 - Просмотр истории своих заказов
+- **Админ-панель**: управление каталогом, загрузка фото в S3, начисление баллов сотрудникам, просмотр всех заказов, audit-лог
 
 ### 1.2 Что **не** входит в MVP
 
-- Уведомления (Slack, email) — заказы видны в интерфейсе, статус обновляется при перезагрузке
-- Автоматический фулфилмент — оплаченные заказы выгружаются админом вручную в Excel
-- Возвраты и сложная история транзакций — только начисление и списание
+- Уведомления (Slack, email) — статус виден в личном кабинете
+- Автоматический фулфилмент — выгрузка заказов в Excel
+- Возвраты и сложная история транзакций
 - Промокоды, скидки, акции
-- Отдельный payment-service — баллы списывает `user-service` через `DeductPoints`
 
 ### 1.3 Ключевые архитектурные принципы
 
-- **gRPC между сервисами** — синхронные вызовы там, где пользователь ждёт ответа (проверка остатков, баланса)
-- **Kafka для асинхронности** — одно событие `order.created`, чтобы развязать создание заказа от резервирования остатков
+- **gRPC между сервисами** — синхронные вызовы там, где пользователь ждёт ответа
+- **Kafka для асинхронности** — одно событие `order.created`
 - **DB per service** — каждый сервис со своей PostgreSQL-схемой, Cart использует Redis
-- **API Gateway как единая точка входа** — клиент работает только с gateway, никогда напрямую с сервисами
+- **API Gateway как единая точка входа** для сотрудников
+- **Admin Service как изолированный слой** — все админские write-операции проходят только через него, с обязательной записью в audit-log
+- **S3 для бинарных файлов** — фото товаров хранятся в MinIO, загрузка через presigned URL напрямую из браузера
 
 ---
 
 ## 2. Сервисы и ответственности
 
-В MVP **6 сервисов**:
+В MVP **7 сервисов**:
 
 | # | Сервис | Что делает | Хранилище |
 |---|---|---|---|
-| 1 | **API Gateway** | Принимает HTTP/gRPC от клиента, проверяет JWT, проксирует в нужный сервис | — |
-| 2 | **Product Service** | Каталог: список товаров, поиск, детали | PostgreSQL |
-| 3 | **Cart Service** | Корзина пользователя с TTL 24h | Redis |
-| 4 | **Order Service** | Создание заказа, история, статусы | PostgreSQL |
-| 5 | **User Service** | Профиль сотрудника, баланс баллов, начисление/списание | PostgreSQL |
-| 6 | **Inventory Service** | Остатки товаров, резервирование при заказе | PostgreSQL |
+| 1 | **API Gateway** | Принимает запросы от сотрудников, проверяет JWT, проксирует в нужный сервис | — |
+| 2 | **Admin Service** | Все админские операции: управление каталогом, начисление баллов, audit | PostgreSQL (audit_log) |
+| 3 | **Product Service** | Каталог: список товаров, поиск, детали, photo_key | PostgreSQL |
+| 4 | **Cart Service** | Корзина пользователя с TTL 24h | Redis |
+| 5 | **Order Service** | Создание заказа, история, статусы | PostgreSQL |
+| 6 | **User Service** | Профиль сотрудника, баланс баллов, начисление/списание | PostgreSQL |
+| 7 | **Inventory Service** | Остатки товаров, резервирование при заказе | PostgreSQL |
 
-### 2.1 Кто кого вызывает (граф зависимостей)
+Плюс инфраструктурный компонент: **MinIO** — S3-совместимое хранилище для фото товаров.
+
+### 2.1 Кто кого вызывает
+
+**Пользовательские потоки (через Gateway):**
 
 | Источник | Цель | Метод | Зачем |
 |---|---|---|---|
-| Gateway | все 5 сервисов | различные | Проксирование клиентских запросов |
-| Cart | Product | `GetProduct` | Получить цену и название для отображения корзины |
-| Cart | Inventory | `CheckStock` | Проверить наличие при добавлении товара |
-| Order | Cart | `GetCart`, `ClearCart` | Взять содержимое корзины и очистить после оформления |
+| Gateway | все сервисы | различные | Проксирование запросов сотрудника |
+| Cart | Product | `GetProduct` | Получить цену и название |
+| Cart | Inventory | `CheckStock` | Проверить наличие при добавлении |
+| Order | Cart | `GetCart`, `ClearCart` | Взять корзину и очистить |
 | Order | User | `GetBalance`, `DeductPoints` | Проверить и списать баллы |
-| Inventory | Kafka (consumer) | `order.created` | Резервирование остатков асинхронно |
-| Order | Kafka (producer) | `order.created` | Публикация события после успешного создания |
+| Order | Kafka (producer) | `order.created` | Публикация события |
+| Inventory | Kafka (consumer) | `order.created` | Резервирование остатков |
 
-Важно: `Product`, `User` и `Inventory` **никого не вызывают синхронно** — только отвечают на gRPC. Это листовые сервисы без зависимостей, их легко тестировать и масштабировать.
+**Админские потоки (через Admin Service):**
+
+| Источник | Цель | Метод | Зачем |
+|---|---|---|---|
+| Admin | Product | `CreateProduct`, `UpdateProduct`, `DeactivateProduct` | Управление каталогом |
+| Admin | Inventory | `AdjustStock` | Изменение остатков |
+| Admin | User | `GrantPoints` | Начисление баллов сотруднику |
+| Admin | Order | `ListAllOrders`, `ExportOrders` | Просмотр и выгрузка всех заказов |
+| Admin | MinIO | `PresignPutObject` | Генерация ссылок для загрузки фото |
+
+Важно: `Admin Service` сам не хранит товары или баллы. Он лишь проверяет роль, пишет в `audit_log` и вызывает соответствующий доменный сервис.
 
 ---
 
 ## 3. Полный сценарий покупки
 
-Самый важный сценарий — пройти его шаг за шагом, чтобы понять весь поток.
-
 ### Шаг 1. Авторизация
-Сотрудник заходит в магазин, проходит через корпоративный SSO, получает JWT-токен. Все последующие запросы идут с этим токеном.
+Сотрудник заходит, проходит через SSO, получает JWT с ролью `user`.
 
 ### Шаг 2. Просмотр каталога
 ```
-Client → Gateway → Product.ListProducts(category="t-shirts", page=1)
-       ← Product.ListProductsResponse{items: [...], total: 24}
+Client → Gateway → Product.ListProducts(category="t-shirts")
+       ← ListProductsResponse{items: [{..., photo_key: "products/abc.jpg"}]}
+
+Браузер сам собирает URL фото:
+       https://minio.merch.local/merch-products/products/abc.jpg
 ```
 
 ### Шаг 3. Добавление в корзину
 ```
-Client → Gateway → Cart.AddItem(user_id, product_id="p123", size="L", qty=1)
+Client → Gateway → Cart.AddItem(user_id, product_id, size, qty)
 
   внутри Cart Service:
-    Cart → Inventory.CheckStock(product_id="p123", size="L")
-         ← StockInfo{available: 12}    [OK, в наличии]
-    Cart → Product.GetProduct(product_id="p123")
-         ← Product{name: "...", price_points: 500, ...}
-    Cart сохраняет в Redis: cart:{user_id} → {items, total_points}
+    Cart → Inventory.CheckStock(product_id, size)
+    Cart → Product.GetProduct(product_id)
+    Cart сохраняет в Redis: cart:{user_id} → JSON
 
-← Cart{items: [...], total_points: 500, expires_at: "..."}
+← Cart{items: [...], total_points}
 ```
 
-### Шаг 4. Оформление заказа (самый интересный шаг)
+### Шаг 4. Оформление заказа
 ```
 Client → Gateway → Order.CreateOrder(user_id, delivery_address)
 
-  внутри Order Service (всё это происходит в одной транзакции Order'а):
+  внутри Order Service:
     1. Order → Cart.GetCart(user_id)
-            ← Cart{items: [...], total_points: 500}
-
     2. Order → User.GetBalance(user_id)
-            ← Balance{points: 1200}      [хватает]
-
-    3. Order → User.DeductPoints(user_id, amount=500, order_id="o456")
-            ← Balance{remaining_points: 700}   [списано]
-
-    4. Order сохраняет заказ в свою БД (orders, order_items) со статусом "pending"
-
-    5. Order → Kafka.publish("order.created", {order_id, user_id, items, total_points})
-
+    3. Order → User.DeductPoints(user_id, amount, order_id)
+    4. Order сохраняет заказ в БД (статус "pending")
+    5. Order публикует в Kafka order.created
     6. Order → Cart.ClearCart(user_id)
-            ← Empty
 
-← Order{id: "o456", status: "pending", created_at: "..."}
+← Order{id, status: "pending"}
 ```
 
 ### Шаг 5. Асинхронная обработка
 ```
-Параллельно, в фоне:
-  Inventory ← Kafka.consume("order.created")
-  Inventory резервирует остатки по каждой позиции (UPDATE stock SET qty = qty - 1)
-  Inventory обновляет статус заказа через gRPC: Order.UpdateStatus(order_id, "confirmed")
+Inventory ← Kafka.consume("order.created")
+Inventory резервирует остатки
+Inventory → Order.UpdateStatus(order_id, "confirmed")
 ```
 
-### Что произойдёт если что-то пойдёт не так
+### Обработка ошибок
 
 | Сбой | Что делаем |
 |---|---|
-| `Inventory.CheckStock` вернул 0 | `Cart.AddItem` возвращает ошибку `OUT_OF_STOCK`, баллы не списаны |
-| `User.GetBalance` показал недостаточно | `Order.CreateOrder` возвращает `INSUFFICIENT_POINTS`, ничего не списано |
-| `Inventory` не смог зарезервировать после Kafka | Публикует событие `order.cancelled` (в MVP — просто меняет статус через gRPC), `Order` возвращает баллы через `User.AddPoints` |
-| Kafka недоступен | `Order.CreateOrder` падает на шаге 5 — баллы уже списаны. Решение: **Transactional Outbox pattern** (сохраняем событие в таблицу `outbox`, отдельный воркер досылает в Kafka) |
+| `CheckStock` вернул 0 | `AddItem` возвращает `OUT_OF_STOCK`, баллы не списаны |
+| Недостаточно баллов | `CreateOrder` возвращает `INSUFFICIENT_POINTS` |
+| Inventory не смог резервировать | Меняет статус на `cancelled`, баллы возвращаются через `AddPoints` |
+| Kafka недоступен | Outbox pattern — событие сохраняется в БД, отдельный воркер досылает |
 
 ---
 
-## 4. gRPC API — все методы и связи
+## 4. Админка — управление и начисление баллов
 
-Все proto-файлы лежат в `proto/{service}/v1/`. Кодогенерация через `buf`.
+### 4.1 Почему отдельный сервис
 
-### 4.1 ProductService
+`admin-service` выделен в отдельный сервис, чтобы:
+- **Изолировать опасные операции.** Методы вроде `GrantPoints` потенциально могут привести к злоупотреблению. Их код полностью изолирован от пользовательских путей
+- **Иметь единый audit-log.** Каждое админское действие записывается в `audit_log` ДО вызова доменного сервиса
+- **Не дублировать логику.** Сам admin-service не хранит товары, баллы или заказы — он вызывает Product, User, Inventory, Order через gRPC
 
-**proto/product/v1/product.proto**
+### 4.2 gRPC API
 
 ```protobuf
 syntax = "proto3";
-package product.v1;
+package admin.v1;
 
-option go_package = "merch-store/proto/product/v1;productv1";
+service AdminService {
+  rpc CreateProduct(CreateProductRequest) returns (Product);
+  rpc UpdateProduct(UpdateProductRequest) returns (Product);
+  rpc DeactivateProduct(DeactivateProductRequest) returns (Empty);
+  
+  rpc AdjustStock(AdjustStockRequest) returns (StockInfo);
+  
+  rpc GrantPoints(GrantPointsRequest) returns (Balance);
+  
+  rpc ListAllOrders(ListAllOrdersRequest) returns (ListOrdersResponse);
+  rpc ExportOrders(ExportOrdersRequest) returns (ExportResponse);
+  
+  rpc GetUploadURL(GetUploadURLRequest) returns (UploadURL);
+  
+  rpc GetAuditLog(GetAuditLogRequest) returns (AuditLogResponse);
+}
 
+message CreateProductRequest {
+  string name = 1;
+  string description = 2;
+  int64 price_points = 3;
+  string category = 4;
+  repeated string sizes = 5;
+  string photo_key = 6;
+}
+
+message GrantPointsRequest {
+  string user_id = 1;
+  int64 amount = 2;
+  string reason = 3;
+}
+
+message GetUploadURLRequest {
+  string filename = 1;
+  string content_type = 2;
+}
+
+message UploadURL {
+  string upload_url = 1;
+  string photo_key = 2;
+  google.protobuf.Timestamp expires_at = 3;
+}
+```
+
+### 4.3 Реализация GrantPoints с audit
+
+```go
+func (s *AdminService) GrantPoints(
+    ctx context.Context, req *pb.GrantPointsRequest,
+) (*pb.Balance, error) {
+    adminID := ctx.Value("admin_id").(string)
+
+    auditID := uuid.New()
+    if err := s.audit.Log(ctx, AuditEntry{
+        ID:         auditID,
+        AdminID:    adminID,
+        Action:     "points.grant",
+        TargetType: "user",
+        TargetID:   req.UserId,
+        Payload:    map[string]any{"amount": req.Amount, "reason": req.Reason},
+    }); err != nil {
+        return nil, status.Error(codes.Internal, "failed to write audit log")
+    }
+
+    balance, err := s.userClient.AddPoints(ctx, &userpb.AddPointsRequest{
+        UserId:    req.UserId,
+        Amount:    req.Amount,
+        Reason:    req.Reason,
+        AuditId:   auditID.String(),
+    })
+    if err != nil {
+        s.audit.MarkFailed(ctx, auditID, err.Error())
+        return nil, err
+    }
+
+    return &pb.Balance{Points: balance.Points}, nil
+}
+```
+
+### 4.4 Сценарии работы админа
+
+**Добавление товара:**
+1. Админ нажимает «Добавить товар», выбирает фото
+2. Браузер запрашивает у admin-service presigned URL для загрузки в S3
+3. Браузер загружает файл напрямую в S3
+4. Браузер вызывает `CreateProduct` с `photo_key`
+5. admin-service пишет audit и вызывает `Product.CreateProduct`
+
+**Начисление баллов:**
+1. Админ открывает профиль сотрудника, вводит сумму и причину
+2. admin-service пишет audit и вызывает `User.AddPoints`
+3. Возвращается новый баланс
+
+**Просмотр заказов:**
+1. admin-service вызывает `Order.ListAllOrders` с фильтрами
+2. По кнопке «Экспорт» — формирует Excel-файл
+
+---
+
+## 5. Хранение фото — MinIO и presigned URL
+
+### 5.1 Почему MinIO
+
+MinIO — S3-совместимое хранилище с открытым исходным кодом. Подходит идеально:
+- Локально разворачивается через `docker-compose` одной строкой
+- В Kubernetes — через StatefulSet
+- Тот же API, что у AWS S3 / Yandex Object Storage — при переезде в облако код не меняется
+- Используется тот же Go-клиент `minio-go`
+
+### 5.2 Паттерн загрузки — presigned URL
+
+Файлы **не** проходят через сервисы. Браузер загружает напрямую в S3, используя временную подписанную ссылку:
+
+```
+1. Браузер → admin-service: GetUploadURL(filename, content_type)
+2. admin-service → MinIO: PresignPutObject() — генерация ссылки на 5 минут
+3. admin-service → Браузер: { upload_url, photo_key }
+4. Браузер → MinIO: PUT файл по upload_url (напрямую!)
+5. Браузер → admin-service: CreateProduct({ ..., photo_key })
+```
+
+**Преимущества:**
+- Сервисы не буферизуют мегабайты в памяти
+- Не нужно настраивать большие `client_max_body_size` в Ingress
+- Загрузка масштабируется отдельно от backend
+
+### 5.3 Реализация GetUploadURL
+
+```go
+import "github.com/minio/minio-go/v7"
+
+func (s *AdminService) GetUploadURL(
+    ctx context.Context, req *pb.GetUploadURLRequest,
+) (*pb.UploadURL, error) {
+    if !isAllowedContentType(req.ContentType) {
+        return nil, status.Error(codes.InvalidArgument, "only jpeg, png, webp allowed")
+    }
+
+    ext := mimeToExt(req.ContentType)
+    key := fmt.Sprintf("products/%s%s", uuid.New(), ext)
+
+    url, err := s.s3.PresignedPutObject(
+        ctx,
+        "merch-products",
+        key,
+        5*time.Minute,
+    )
+    if err != nil {
+        return nil, status.Error(codes.Internal, "failed to generate URL")
+    }
+
+    return &pb.UploadURL{
+        UploadUrl: url.String(),
+        PhotoKey:  key,
+        ExpiresAt: timestamppb.New(time.Now().Add(5 * time.Minute)),
+    }, nil
+}
+
+func isAllowedContentType(ct string) bool {
+    return ct == "image/jpeg" || ct == "image/png" || ct == "image/webp"
+}
+```
+
+### 5.4 Bucket'ы и доступ
+
+| Bucket | Доступ | Назначение |
+|---|---|---|
+| `merch-products` | public-read | Фото товаров |
+
+Bucket `merch-products` настроен на публичное чтение — любой пользователь может посмотреть фото товара по прямой ссылке. Это упрощает фронт: ему не нужны presigned GET URL для каждого товара.
+
+### 5.5 Что хранит Product Service
+
+Сервис **не хранит файл**, только ключ:
+
+```sql
+ALTER TABLE products ADD COLUMN photo_key TEXT;
+```
+
+При выдаче товара клиент сам собирает URL: `https://{S3_PUBLIC_HOST}/merch-products/{photo_key}`. Хост передаётся фронту через переменную окружения.
+
+### 5.6 Деплой MinIO в Kubernetes
+
+```yaml
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: minio
+  namespace: merch-prod
+spec:
+  serviceName: minio
+  replicas: 1
+  selector:
+    matchLabels:
+      app: minio
+  template:
+    metadata:
+      labels:
+        app: minio
+    spec:
+      containers:
+      - name: minio
+        image: minio/minio:latest
+        args: ["server", "/data", "--console-address", ":9001"]
+        ports:
+        - containerPort: 9000
+          name: s3-api
+        - containerPort: 9001
+          name: console
+        env:
+        - name: MINIO_ROOT_USER
+          valueFrom:
+            secretKeyRef:
+              name: minio-credentials
+              key: user
+        - name: MINIO_ROOT_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: minio-credentials
+              key: password
+        volumeMounts:
+        - name: data
+          mountPath: /data
+  volumeClaimTemplates:
+  - metadata:
+      name: data
+    spec:
+      accessModes: [ReadWriteOnce]
+      resources:
+        requests:
+          storage: 10Gi
+```
+
+---
+
+## 6. gRPC API
+
+### 6.1 ProductService
+
+```protobuf
 service ProductService {
   rpc GetProduct(GetProductRequest) returns (Product);
   rpc ListProducts(ListProductsRequest) returns (ListProductsResponse);
+  rpc CreateProduct(CreateProductRequest) returns (Product);
+  rpc UpdateProduct(UpdateProductRequest) returns (Product);
+  rpc DeactivateProduct(DeactivateProductRequest) returns (Empty);
 }
 
 message Product {
@@ -180,139 +431,18 @@ message Product {
   string name = 2;
   string description = 3;
   int64 price_points = 4;
-  string category = 5;          // "t-shirts", "mugs", "hoodies"
-  repeated string sizes = 6;    // ["S", "M", "L", "XL"]
-  string photo_url = 7;
+  string category = 5;
+  repeated string sizes = 6;
+  string photo_key = 7;
   bool active = 8;
 }
-
-message GetProductRequest {
-  string product_id = 1;
-}
-
-message ListProductsRequest {
-  int32 page = 1;
-  int32 limit = 2;
-  string category = 3;          // optional фильтр
-}
-
-message ListProductsResponse {
-  repeated Product items = 1;
-  int32 total = 2;
-}
 ```
 
-| Метод | Кто вызывает | Когда |
-|---|---|---|
-| `GetProduct` | Cart, Order, Gateway | Получить детали товара |
-| `ListProducts` | Gateway | Показать каталог пользователю |
+`Create/Update/Deactivate` доступны **только** для `admin-service` — это обеспечивается NetworkPolicy в Kubernetes.
 
-### 4.2 CartService
-
-**proto/cart/v1/cart.proto**
+### 6.2 UserService
 
 ```protobuf
-syntax = "proto3";
-package cart.v1;
-
-service CartService {
-  rpc AddItem(AddItemRequest) returns (Cart);
-  rpc RemoveItem(RemoveItemRequest) returns (Cart);
-  rpc GetCart(GetCartRequest) returns (Cart);
-  rpc ClearCart(ClearCartRequest) returns (Empty);
-}
-
-message Cart {
-  string user_id = 1;
-  repeated CartItem items = 2;
-  int64 total_points = 3;
-  google.protobuf.Timestamp expires_at = 4;
-}
-
-message CartItem {
-  string product_id = 1;
-  string product_name = 2;       // снепшот для UI
-  string size = 3;
-  int32 qty = 4;
-  int64 price_points = 5;        // снепшот цены на момент добавления
-}
-
-message AddItemRequest {
-  string user_id = 1;
-  string product_id = 2;
-  string size = 3;
-  int32 qty = 4;
-}
-```
-
-| Метод | Кто вызывает | Когда |
-|---|---|---|
-| `AddItem` | Gateway | Пользователь нажал «В корзину» |
-| `RemoveItem` | Gateway | Пользователь удалил позицию |
-| `GetCart` | Gateway, **Order** | Показать корзину / получить для создания заказа |
-| `ClearCart` | **Order** | После успешного оформления |
-
-### 4.3 OrderService
-
-**proto/order/v1/order.proto**
-
-```protobuf
-syntax = "proto3";
-package order.v1;
-
-service OrderService {
-  rpc CreateOrder(CreateOrderRequest) returns (Order);
-  rpc GetOrder(GetOrderRequest) returns (Order);
-  rpc ListUserOrders(ListUserOrdersRequest) returns (ListUserOrdersResponse);
-  rpc UpdateStatus(UpdateStatusRequest) returns (Order);
-}
-
-enum OrderStatus {
-  ORDER_STATUS_UNSPECIFIED = 0;
-  ORDER_STATUS_PENDING = 1;       // создан, ждёт резерва остатков
-  ORDER_STATUS_CONFIRMED = 2;     // остатки зарезервированы
-  ORDER_STATUS_CANCELLED = 3;     // не удалось зарезервировать или отменён
-}
-
-message Order {
-  string id = 1;
-  string user_id = 2;
-  repeated OrderItem items = 3;
-  int64 total_points = 4;
-  string delivery_address = 5;
-  OrderStatus status = 6;
-  google.protobuf.Timestamp created_at = 7;
-}
-
-message OrderItem {
-  string product_id = 1;
-  string product_name = 2;
-  string size = 3;
-  int32 qty = 4;
-  int64 price_points = 5;
-}
-
-message CreateOrderRequest {
-  string user_id = 1;
-  string delivery_address = 2;
-}
-```
-
-| Метод | Кто вызывает | Когда |
-|---|---|---|
-| `CreateOrder` | Gateway | Пользователь нажал «Оформить» |
-| `GetOrder` | Gateway | Просмотр конкретного заказа |
-| `ListUserOrders` | Gateway | История заказов пользователя |
-| `UpdateStatus` | **Inventory** | После резерва / при отмене |
-
-### 4.4 UserService
-
-**proto/user/v1/user.proto**
-
-```protobuf
-syntax = "proto3";
-package user.v1;
-
 service UserService {
   rpc GetUser(GetUserRequest) returns (User);
   rpc GetBalance(GetBalanceRequest) returns (Balance);
@@ -320,91 +450,43 @@ service UserService {
   rpc AddPoints(AddPointsRequest) returns (Balance);
 }
 
-message User {
-  string id = 1;
-  string email = 2;
-  string full_name = 3;
-  string department = 4;
-}
-
-message Balance {
-  string user_id = 1;
-  int64 points = 2;
-}
-
-message DeductPointsRequest {
+message AddPointsRequest {
   string user_id = 1;
   int64 amount = 2;
-  string order_id = 3;            // для идемпотентности
-  string reason = 4;
+  string reason = 3;
+  string audit_id = 4;
 }
 ```
 
-| Метод | Кто вызывает | Когда |
-|---|---|---|
-| `GetUser` | Gateway | Получение профиля |
-| `GetBalance` | Gateway, **Order** | Показать баланс / проверить перед списанием |
-| `DeductPoints` | **Order** | Списать при создании заказа |
-| `AddPoints` | **Order** | Вернуть при отмене (компенсация) |
+`AddPoints` использует `audit_id` для идемпотентности — повторный вызов с тем же ID не приведёт к двойному начислению.
 
-`DeductPoints` использует `order_id` как ключ идемпотентности — повторный вызов с тем же `order_id` не приведёт к двойному списанию.
-
-### 4.5 InventoryService
-
-**proto/inventory/v1/inventory.proto**
+### 6.3 InventoryService
 
 ```protobuf
-syntax = "proto3";
-package inventory.v1;
-
 service InventoryService {
   rpc CheckStock(CheckStockRequest) returns (StockInfo);
   rpc ReserveStock(ReserveStockRequest) returns (Reservation);
   rpc ReleaseReserve(ReleaseReserveRequest) returns (Empty);
+  rpc AdjustStock(AdjustStockRequest) returns (StockInfo);
 }
 
-message StockInfo {
+message AdjustStockRequest {
   string product_id = 1;
   string size = 2;
-  int32 available = 3;
-}
-
-message ReserveStockRequest {
-  string order_id = 1;            // ключ идемпотентности
-  repeated ReserveItem items = 2;
-}
-
-message ReserveItem {
-  string product_id = 1;
-  string size = 2;
-  int32 qty = 3;
-}
-
-message Reservation {
-  string id = 1;
-  string order_id = 2;
-  google.protobuf.Timestamp expires_at = 3;
+  int32 delta = 3;
+  string audit_id = 4;
 }
 ```
 
-| Метод | Кто вызывает | Когда |
-|---|---|---|
-| `CheckStock` | **Cart** | Проверка при `AddItem` |
-| `ReserveStock` | внутренний | Используется обработчиком Kafka-события |
-| `ReleaseReserve` | внутренний | При отмене заказа |
+(остальные сервисы — Cart, Order — без изменений из предыдущей версии)
 
 ---
 
-## 5. Kafka — событие order.created
+## 7. Kafka — событие order.created
 
-В MVP **один топик** — `order.created`. Этого достаточно: всё остальное обрабатывается синхронно через gRPC.
-
-### 5.1 Структура события
+В MVP **один топик** — `order.created`.
 
 ```protobuf
-syntax = "proto3";
-package events.v1;
-
 message OrderCreatedEvent {
   string order_id = 1;
   string user_id = 2;
@@ -413,76 +495,22 @@ message OrderCreatedEvent {
   string delivery_address = 5;
   google.protobuf.Timestamp created_at = 6;
 }
-
-message OrderItemEvent {
-  string product_id = 1;
-  string size = 2;
-  int32 qty = 3;
-}
 ```
 
-### 5.2 Конфигурация топика
+Конфигурация: 3 партиции, replication factor 2, retention 7 дней.
 
-| Параметр | Значение | Зачем |
-|---|---|---|
-| partitions | 3 | Возможность горизонтального масштабирования consumer'ов |
-| replication.factor | 2 | Отказоустойчивость (в проде — 3) |
-| retention.ms | 604800000 (7 дней) | Возможность replay в случае инцидентов |
-| cleanup.policy | delete | Логи удаляются по retention |
+Producer (Order Service): `acks=all`, `enable.idempotence=true`.
+Consumer (Inventory Service): `group.id=inventory-service`, ручной коммит, идемпотентная обработка по `order_id`.
 
-### 5.3 Producer (в Order Service)
+### Transactional Outbox
 
-Используется `confluent-kafka-go` или `segmentio/kafka-go`. Конфигурация:
-
-```go
-config := &kafka.ConfigMap{
-    "bootstrap.servers":  os.Getenv("KAFKA_BROKERS"),
-    "acks":               "all",            // ждём подтверждения от всех реплик
-    "enable.idempotence": true,             // защита от дубликатов
-    "retries":            10,
-    "retry.backoff.ms":   100,
-}
-```
-
-### 5.4 Consumer (в Inventory Service)
-
-```go
-config := &kafka.ConfigMap{
-    "bootstrap.servers":   os.Getenv("KAFKA_BROKERS"),
-    "group.id":            "inventory-service",
-    "auto.offset.reset":   "earliest",
-    "enable.auto.commit":  false,           // ручной коммит после успешной обработки
-}
-```
-
-Обработка должна быть **идемпотентной** — если consumer упал после обработки, но до коммита, при перезапуске тот же event придёт снова. Используем `order_id` для дедупликации.
-
-### 5.5 Transactional Outbox Pattern
-
-Чтобы избежать ситуации «заказ записан в БД, но Kafka недоступен», `order-service` использует Outbox-паттерн:
-
-1. В транзакции вставляем запись в таблицу `orders` **и** в таблицу `outbox` (событие)
-2. Отдельная горутина читает `outbox` и шлёт в Kafka, помечая отправленные
-3. При сбое — повторяет, гарантируя at-least-once доставку
-
-```sql
-CREATE TABLE outbox (
-    id          UUID PRIMARY KEY,
-    aggregate   TEXT NOT NULL,
-    event_type  TEXT NOT NULL,
-    payload     BYTEA NOT NULL,
-    created_at  TIMESTAMPTZ DEFAULT NOW(),
-    sent_at     TIMESTAMPTZ
-);
-```
+Для гарантии доставки используется Outbox-паттерн: событие пишется в таблицу `outbox` в одной транзакции с заказом, отдельная горутина досылает в Kafka.
 
 ---
 
-## 6. Схема данных по сервисам
+## 8. Схема данных
 
-Каждый сервис имеет **собственную БД**. Никакого shared schema, никаких JOIN между сервисами.
-
-### 6.1 Product Service (PostgreSQL)
+### 8.1 Product Service
 
 ```sql
 CREATE TABLE products (
@@ -492,39 +520,24 @@ CREATE TABLE products (
     price_points  BIGINT NOT NULL CHECK (price_points >= 0),
     category      TEXT NOT NULL,
     sizes         TEXT[] NOT NULL,
-    photo_url     TEXT,
+    photo_key     TEXT,
     active        BOOLEAN DEFAULT true,
     created_at    TIMESTAMPTZ DEFAULT NOW(),
     updated_at    TIMESTAMPTZ DEFAULT NOW()
 );
 
 CREATE INDEX idx_products_category ON products(category) WHERE active = true;
-CREATE INDEX idx_products_active   ON products(active);
 ```
 
-### 6.2 Cart Service (Redis)
-
-Корзина хранится как один JSON-объект на пользователя:
+### 8.2 Cart Service (Redis)
 
 ```
 Key:   cart:{user_id}
 Type:  String (JSON)
 TTL:   86400 (24 часа)
-
-Value:
-{
-  "user_id": "u123",
-  "items": [
-    {"product_id": "p1", "name": "T-shirt Black", "size": "L", "qty": 2, "price_points": 500}
-  ],
-  "total_points": 1000,
-  "updated_at": "2026-05-26T10:00:00Z"
-}
 ```
 
-При каждой операции (`AddItem`, `RemoveItem`) TTL обновляется, чтобы активная корзина не пропадала.
-
-### 6.3 Order Service (PostgreSQL)
+### 8.3 Order Service
 
 ```sql
 CREATE TYPE order_status AS ENUM ('pending', 'confirmed', 'cancelled');
@@ -535,22 +548,18 @@ CREATE TABLE orders (
     total_points     BIGINT NOT NULL,
     delivery_address TEXT NOT NULL,
     status           order_status NOT NULL DEFAULT 'pending',
-    created_at       TIMESTAMPTZ DEFAULT NOW(),
-    updated_at       TIMESTAMPTZ DEFAULT NOW()
+    created_at       TIMESTAMPTZ DEFAULT NOW()
 );
 
 CREATE TABLE order_items (
     id            UUID PRIMARY KEY,
-    order_id      UUID NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+    order_id      UUID NOT NULL REFERENCES orders(id),
     product_id    UUID NOT NULL,
-    product_name  TEXT NOT NULL,        -- снепшот, на случай удаления товара
+    product_name  TEXT NOT NULL,
     size          TEXT NOT NULL,
     qty           INT NOT NULL,
     price_points  BIGINT NOT NULL
 );
-
-CREATE INDEX idx_orders_user_created ON orders(user_id, created_at DESC);
-CREATE INDEX idx_orders_status        ON orders(status);
 
 CREATE TABLE outbox (
     id          UUID PRIMARY KEY,
@@ -560,544 +569,309 @@ CREATE TABLE outbox (
     created_at  TIMESTAMPTZ DEFAULT NOW(),
     sent_at     TIMESTAMPTZ
 );
-
-CREATE INDEX idx_outbox_unsent ON outbox(created_at) WHERE sent_at IS NULL;
 ```
 
-### 6.4 User Service (PostgreSQL)
+### 8.4 User Service
 
 ```sql
 CREATE TABLE users (
     id          UUID PRIMARY KEY,
     email       TEXT UNIQUE NOT NULL,
     full_name   TEXT NOT NULL,
-    department  TEXT,
-    created_at  TIMESTAMPTZ DEFAULT NOW()
+    department  TEXT
 );
 
 CREATE TABLE points_balance (
     user_id     UUID PRIMARY KEY REFERENCES users(id),
-    points      BIGINT NOT NULL DEFAULT 0 CHECK (points >= 0),
-    updated_at  TIMESTAMPTZ DEFAULT NOW()
+    points      BIGINT NOT NULL DEFAULT 0 CHECK (points >= 0)
 );
 
 CREATE TABLE points_transactions (
     id          UUID PRIMARY KEY,
     user_id     UUID NOT NULL REFERENCES users(id),
-    amount      BIGINT NOT NULL,          -- положительное = начисление, отрицательное = списание
+    amount      BIGINT NOT NULL,
     reason      TEXT NOT NULL,
-    order_id    UUID,                     -- NULL для начислений, заполнено для списаний
+    order_id    UUID,
+    audit_id    UUID,
     created_at  TIMESTAMPTZ DEFAULT NOW(),
-    UNIQUE(order_id, user_id)             -- идемпотентность DeductPoints
+    UNIQUE(order_id, user_id),
+    UNIQUE(audit_id)
 );
-
-CREATE INDEX idx_tx_user ON points_transactions(user_id, created_at DESC);
 ```
 
-`DeductPoints` работает так: в одной транзакции вставляет запись в `points_transactions` (с уникальным ключом по `order_id`) и обновляет `points_balance.points`. Если запись с таким `order_id` уже есть — возвращает текущий баланс, не списывая повторно.
-
-### 6.5 Inventory Service (PostgreSQL)
+### 8.5 Inventory Service
 
 ```sql
 CREATE TABLE stock (
     product_id    UUID NOT NULL,
     size          TEXT NOT NULL,
     available     INT NOT NULL CHECK (available >= 0),
-    updated_at    TIMESTAMPTZ DEFAULT NOW(),
     PRIMARY KEY (product_id, size)
 );
 
 CREATE TABLE reservations (
     id           UUID PRIMARY KEY,
-    order_id     UUID UNIQUE NOT NULL,    -- идемпотентность
-    items        JSONB NOT NULL,          -- [{product_id, size, qty}]
-    created_at   TIMESTAMPTZ DEFAULT NOW(),
-    expires_at   TIMESTAMPTZ NOT NULL
+    order_id     UUID UNIQUE NOT NULL,
+    items        JSONB NOT NULL,
+    created_at   TIMESTAMPTZ DEFAULT NOW()
 );
-
-CREATE INDEX idx_reservations_order ON reservations(order_id);
 ```
 
-Резервирование — это атомарный `UPDATE stock SET available = available - $qty WHERE product_id = $1 AND size = $2 AND available >= $qty RETURNING available`. Если `UPDATE` затронул 0 строк — товара нет.
+### 8.6 Admin Service — audit_log
+
+```sql
+CREATE TABLE audit_log (
+    id          UUID PRIMARY KEY,
+    admin_id    UUID NOT NULL,
+    action      TEXT NOT NULL,
+    target_type TEXT NOT NULL,
+    target_id   TEXT NOT NULL,
+    payload     JSONB NOT NULL,
+    status      TEXT DEFAULT 'success',
+    error       TEXT,
+    created_at  TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX idx_audit_admin   ON audit_log(admin_id, created_at DESC);
+CREATE INDEX idx_audit_target  ON audit_log(target_type, target_id);
+CREATE INDEX idx_audit_action  ON audit_log(action, created_at DESC);
+```
+
+Примеры записей:
+
+| action | target_type | target_id | payload |
+|---|---|---|---|
+| `product.create` | `product` | `p123` | `{"name": "T-shirt", "price": 500}` |
+| `points.grant` | `user` | `u456` | `{"amount": 1000, "reason": "Q4 bonus"}` |
+| `stock.adjust` | `product` | `p123` | `{"size": "L", "delta": 50}` |
 
 ---
 
-## 7. Структура репозитория
-
-Monorepo с разделением на сервисы и общий код:
+## 9. Структура репозитория
 
 ```
 merch-store/
-├── proto/                              # gRPC контракты
-│   ├── product/v1/product.proto
-│   ├── cart/v1/cart.proto
-│   ├── order/v1/order.proto
-│   ├── user/v1/user.proto
-│   ├── inventory/v1/inventory.proto
-│   └── events/v1/order_events.proto   # Kafka-сообщения
+├── proto/
+│   ├── product/v1/
+│   ├── cart/v1/
+│   ├── order/v1/
+│   ├── user/v1/
+│   ├── inventory/v1/
+│   ├── admin/v1/
+│   └── events/v1/
 │
 ├── services/
 │   ├── api-gateway/
+│   ├── admin-service/
 │   ├── product-service/
 │   ├── cart-service/
 │   ├── order-service/
 │   ├── user-service/
 │   └── inventory-service/
 │
-├── pkg/                                # Переиспользуемый код
-│   ├── kafka/                          # Producer/Consumer helpers
-│   ├── grpc/                           # Interceptors (auth, logging, tracing, metrics)
-│   ├── config/                         # Viper loader
-│   ├── database/                       # pgx pool helper
-│   └── logger/                         # Zap setup
+├── pkg/
+│   ├── kafka/
+│   ├── grpc/
+│   ├── s3/
+│   ├── config/
+│   └── logger/
 │
 ├── k8s/
-│   ├── base/                           # Базовые манифесты
-│   │   ├── product-service.yaml
-│   │   ├── cart-service.yaml
-│   │   ├── order-service.yaml
-│   │   ├── user-service.yaml
-│   │   ├── inventory-service.yaml
-│   │   ├── api-gateway.yaml
+│   ├── base/
 │   │   ├── postgres.yaml
 │   │   ├── redis.yaml
-│   │   └── kafka.yaml
+│   │   ├── kafka.yaml
+│   │   ├── minio.yaml
+│   │   └── services/
 │   └── overlays/
 │       ├── dev/
 │       └── prod/
 │
-├── docker-compose.yml                  # Локальная разработка
-├── buf.yaml                            # Конфиг buf для proto-генерации
-├── buf.gen.yaml
+├── docker-compose.yml
+├── buf.yaml
 └── Makefile
 ```
 
-### 7.1 Структура отдельного сервиса (на примере order-service)
-
-Используем чистую архитектуру (хендлер → сервис → репозиторий):
-
-```
-order-service/
-├── cmd/
-│   └── main.go                         # Entry point, DI wiring
-│
-├── internal/
-│   ├── handler/                        # gRPC хендлеры
-│   │   └── order_handler.go            # реализует pb.OrderServiceServer
-│   │
-│   ├── service/                        # Бизнес-логика
-│   │   └── order_service.go            # CreateOrder со всей оркестрацией
-│   │
-│   ├── repository/                     # Работа с БД
-│   │   ├── order_repo.go
-│   │   └── outbox_repo.go
-│   │
-│   ├── client/                         # gRPC клиенты к другим сервисам
-│   │   ├── cart_client.go
-│   │   └── user_client.go
-│   │
-│   ├── kafka/                          # Outbox dispatcher
-│   │   └── outbox_publisher.go
-│   │
-│   └── config/
-│       └── config.go
-│
-├── migrations/                         # SQL миграции (goose/golang-migrate)
-│   ├── 001_create_orders.up.sql
-│   └── 001_create_orders.down.sql
-│
-├── Dockerfile
-└── config.yaml
-```
-
-### 7.2 Makefile — основные команды
-
-```makefile
-.PHONY: proto build test docker up down
-
-proto:
-	buf generate
-
-build:
-	@for svc in product-service cart-service order-service user-service inventory-service api-gateway; do \
-		go build -o ./bin/$$svc ./services/$$svc/cmd; \
-	done
-
-test:
-	go test ./...
-
-docker:
-	@for svc in product-service cart-service order-service user-service inventory-service api-gateway; do \
-		docker build -t merch/$$svc:latest -f services/$$svc/Dockerfile .; \
-	done
-
-up:
-	docker-compose up -d
-
-down:
-	docker-compose down -v
-
-k8s-deploy:
-	kubectl apply -k k8s/overlays/dev
-```
-
 ---
 
-## 8. Kubernetes — деплой
+## 10. Kubernetes — деплой
 
-### 8.1 Структура неймспейсов
+### 10.1 Неймспейсы
 
-- `merch-dev` — окружение для разработки и интеграционных тестов
-- `merch-prod` — продакшен
-- `kafka` — Strimzi Kafka Operator + Kafka cluster
+- `merch-prod` — основное окружение
+- `kafka` — Strimzi Kafka cluster
 - `monitoring` — Prometheus, Grafana, Jaeger
 
-### 8.2 Пример Deployment для order-service
+### 10.2 Ресурсы
 
-```yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: order-service
-  namespace: merch-prod
-  labels:
-    app: order-service
-spec:
-  replicas: 2
-  selector:
-    matchLabels:
-      app: order-service
-  template:
-    metadata:
-      labels:
-        app: order-service
-    spec:
-      containers:
-      - name: order-service
-        image: registry.local/merch/order-service:v1.0.0
-        ports:
-        - containerPort: 50051
-          name: grpc
-        - containerPort: 9090
-          name: metrics
-        env:
-        - name: KAFKA_BROKERS
-          valueFrom:
-            configMapKeyRef:
-              name: kafka-config
-              key: brokers
-        - name: DB_DSN
-          valueFrom:
-            secretKeyRef:
-              name: order-db
-              key: dsn
-        - name: CART_SERVICE_ADDR
-          value: "cart-service:50051"
-        - name: USER_SERVICE_ADDR
-          value: "user-service:50051"
-        resources:
-          requests:
-            cpu: 150m
-            memory: 256Mi
-          limits:
-            cpu: 500m
-            memory: 512Mi
-        readinessProbe:
-          grpc:
-            port: 50051
-          initialDelaySeconds: 5
-          periodSeconds: 5
-        livenessProbe:
-          grpc:
-            port: 50051
-          periodSeconds: 10
-          failureThreshold: 3
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: order-service
-  namespace: merch-prod
-spec:
-  selector:
-    app: order-service
-  ports:
-  - port: 50051
-    targetPort: 50051
-    name: grpc
-  - port: 9090
-    targetPort: 9090
-    name: metrics
-```
+| Сервис | Replicas | CPU req | Mem req | HPA max |
+|---|---|---|---|---|
+| api-gateway | 2 | 200m | 256Mi | 8 |
+| admin-service | 1 | 100m | 128Mi | 2 |
+| product-service | 2 | 100m | 128Mi | 6 |
+| cart-service | 2 | 100m | 128Mi | 6 |
+| order-service | 2 | 150m | 256Mi | 8 |
+| user-service | 2 | 100m | 128Mi | 4 |
+| inventory-service | 2 | 100m | 128Mi | 6 |
+| minio | 1 | 200m | 512Mi | — |
 
-### 8.3 HPA по метрикам
+### 10.3 NetworkPolicy для admin-service
 
-```yaml
-apiVersion: autoscaling/v2
-kind: HorizontalPodAutoscaler
-metadata:
-  name: order-service-hpa
-  namespace: merch-prod
-spec:
-  scaleTargetRef:
-    apiVersion: apps/v1
-    kind: Deployment
-    name: order-service
-  minReplicas: 2
-  maxReplicas: 8
-  metrics:
-  - type: Resource
-    resource:
-      name: cpu
-      target:
-        type: Utilization
-        averageUtilization: 70
-```
-
-### 8.4 Ingress для API Gateway
+Критически важно ограничить, кто может вызывать admin-service:
 
 ```yaml
 apiVersion: networking.k8s.io/v1
-kind: Ingress
+kind: NetworkPolicy
 metadata:
-  name: merch-gateway
+  name: admin-service-policy
   namespace: merch-prod
-  annotations:
-    cert-manager.io/cluster-issuer: letsencrypt
 spec:
-  tls:
-  - hosts:
-    - merch.company.com
-    secretName: merch-tls
-  rules:
-  - host: merch.company.com
-    http:
-      paths:
-      - path: /
-        pathType: Prefix
-        backend:
-          service:
-            name: api-gateway
-            port:
-              number: 8080
+  podSelector:
+    matchLabels:
+      app: admin-service
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app: admin-gateway
+```
+
+Точно так же — write-методы Product, User, Inventory должны быть доступны только из admin-service:
+
+```yaml
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: product-write-policy
+  namespace: merch-prod
+spec:
+  podSelector:
+    matchLabels:
+      app: product-service
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app: api-gateway
+    - podSelector:
+        matchLabels:
+          app: admin-service
+    - podSelector:
+        matchLabels:
+          app: cart-service
+    - podSelector:
+        matchLabels:
+          app: order-service
 ```
 
 ---
 
-## 9. Наблюдаемость
+## 11. Наблюдаемость
 
-### 9.1 Метрики (Prometheus)
-
-Каждый сервис экспонирует `/metrics` на порту 9090.
+### 11.1 Метрики
 
 Технические:
-- `grpc_server_handled_total{service, method, code}` — количество запросов
-- `grpc_server_handling_seconds{service, method}` — latency (histogram)
-- `kafka_consumer_lag{topic, partition}` — отставание consumer'ов
-- `db_query_duration_seconds{service, query_type}` — время БД-запросов
+- `grpc_server_handled_total{service, method, code}`
+- `grpc_server_handling_seconds{service, method}`
+- `kafka_consumer_lag{topic, partition}`
+- `s3_upload_url_generated_total`
+- `s3_objects_uploaded_total`
 
-Бизнес-метрики:
-- `merch_orders_created_total` — счётчик созданных заказов
-- `merch_orders_cancelled_total{reason}` — отмены с причинами
-- `merch_cart_items_added_total` — добавления в корзину
+Бизнес:
+- `merch_orders_created_total`
+- `merch_points_granted_total{admin_id}`
+- `merch_products_created_total{admin_id}`
 
-### 9.2 Distributed tracing (Jaeger)
+### 11.2 Audit-аналитика
 
-OpenTelemetry SDK + автоматические interceptor'ы для gRPC и пропагация trace_id через Kafka headers.
-
-```go
-import (
-    "go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
-    "google.golang.org/grpc"
-)
-
-server := grpc.NewServer(
-    grpc.UnaryInterceptor(otelgrpc.UnaryServerInterceptor()),
-)
-
-conn, _ := grpc.Dial(addr,
-    grpc.WithUnaryInterceptor(otelgrpc.UnaryClientInterceptor()),
-)
-```
-
-Это позволяет в Jaeger увидеть полный trace одного `CreateOrder`: gateway → order-service → cart-service → product-service → user-service → kafka → inventory-service.
-
-### 9.3 Логи (Zap)
-
-Структурированные JSON-логи. Обязательные поля:
-
-```json
-{
-  "level": "info",
-  "timestamp": "2026-05-26T10:00:00.000Z",
-  "service": "order-service",
-  "trace_id": "abc123",
-  "span_id": "def456",
-  "message": "order created",
-  "order_id": "o789",
-  "user_id": "u123",
-  "total_points": 500
-}
-```
-
-Сбор через Fluent Bit → Loki, просмотр через Grafana.
+Поверх таблицы `audit_log` можно строить дашборды:
+- Кто из админов сколько баллов начислил за месяц
+- Топ-10 наиболее активных админов
+- Аномалии — например, разовое начисление > 10000 баллов
 
 ---
 
-## 10. План реализации по неделям
+## 12. План реализации по неделям
 
 ### Неделя 1 — Фундамент и листовые сервисы
 
-**Цель**: рабочий локальный стек с двумя сервисами без зависимостей.
+- День 1-2: monorepo, buf, Makefile, docker-compose (Postgres × 6, Redis, Kafka, MinIO)
+- День 3-4: product-service (proto, БД, gRPC)
+- День 5-6: user-service (proto, БД с points_transactions)
+- День 7: inventory-service (proto, БД, атомарное резервирование)
 
-- День 1-2: настройка monorepo, `buf` для proto, Makefile, `docker-compose.yml` (Postgres × 5, Redis, Kafka, Zookeeper)
-- День 3-4: `product-service` — proto, БД, миграции, gRPC server, базовые методы, unit-тесты
-- День 5-6: `user-service` — proto, БД с `points_transactions`, gRPC server, идемпотентность `DeductPoints`
-- День 7: `inventory-service` — proto, БД, атомарное резервирование через SQL
+### Неделя 2 — Корзина, заказы, админка
 
-**Результат недели**: три сервиса запускаются в docker-compose, можно вызвать их через `grpcurl`.
-
-### Неделя 2 — Корзина, заказы, Kafka
-
-**Цель**: полный пользовательский сценарий покупки.
-
-- День 8-9: `cart-service` — Redis-репозиторий, gRPC server, вызов `Product.GetProduct` и `Inventory.CheckStock` через gRPC-клиенты
-- День 10-12: `order-service` — gRPC server, оркестрация (Cart → User → save → Kafka → ClearCart), Outbox-паттерн
-- День 13: Kafka producer в `order-service`, consumer в `inventory-service`, обработка `order.created`
-- День 14: `api-gateway` — gRPC-gateway, JWT-middleware, маршрутизация
-
-**Результат недели**: полный e2e сценарий покупки работает локально.
+- День 8-9: cart-service (Redis, gRPC-клиенты)
+- День 10-11: order-service (оркестрация, Outbox)
+- День 12: Kafka producer/consumer
+- День 13: api-gateway (JWT, маршрутизация)
+- День 14: admin-service (CRUD каталога, GrantPoints, audit_log, MinIO presigned URL)
 
 ### Неделя 3 — Kubernetes
 
-**Цель**: всё развёрнуто в k8s-кластере.
-
-- День 15-16: Dockerfile для каждого сервиса (multi-stage, distroless), сборка через Makefile, локальный registry
-- День 17: K8s манифесты — Deployment, Service, ConfigMap, Secret для каждого сервиса
-- День 18: Strimzi Kafka Operator в кластере, создание топика `order.created`
-- День 19: PostgreSQL операторы (или StatefulSet), Redis Deployment
-- День 20: Ingress + cert-manager для gateway, HPA для всех сервисов
-- День 21: Kustomize overlays для dev/prod, smoke-тесты в кластере
-
-**Результат недели**: проект развёрнут в k8s, доступен через домен.
+- День 15-16: Dockerfile (multi-stage, distroless)
+- День 17-18: K8s манифесты, Strimzi Kafka, MinIO StatefulSet
+- День 19: NetworkPolicy для admin-service и write-методов
+- День 20: HPA, Ingress + TLS
+- День 21: Kustomize, smoke-тесты
 
 ### Неделя 4 — Наблюдаемость и доводка
 
-**Цель**: продакшен-готовность.
-
-- День 22-23: OpenTelemetry interceptors во всех сервисах, Jaeger в кластере, проверка end-to-end trace
-- День 24: Prometheus + Grafana, dashboard'ы для бизнес- и технических метрик
-- День 25: ELK/Loki для логов, alert'ы в Grafana (consumer lag, error rate)
-- День 26-27: e2e-тесты сценария покупки, нагрузочное тестирование через k6 (target: 100 RPS)
-- День 28: финальная проверка, документация, демо
-
-**Результат**: проект готов к презентации с метриками и графиками.
+- День 22-23: OpenTelemetry, Jaeger
+- День 24: Prometheus + Grafana, бизнес-дашборды
+- День 25: Loki для логов, alert'ы
+- День 26-27: e2e-тесты, нагрузочное тестирование (k6)
+- День 28: финал, документация, демо
 
 ---
 
-## 11. Архитектурные решения (ADR)
+## 13. Архитектурные решения (ADR)
 
 ### ADR-001: gRPC + Protobuf для синхронных вызовов
+Бинарная сериализация, строгий контракт, HTTP/2 multiplexing.
 
-**Контекст**: нужен межсервисный протокол с типизацией и низкой задержкой.
-
-**Решение**: gRPC поверх HTTP/2 с Protobuf вместо REST/JSON.
-
-**Альтернативы**:
-- REST/JSON — отвергнут: больше latency, нет строгого контракта, ручной парсинг ошибок
-- GraphQL — отвергнут: избыточен для server-to-server, оверхед на парсинг queries
-
-**Последствия**: нужен `buf` для генерации, сложнее отлаживать (бинарный формат), но быстрее на ~3-5x и контракт строго типизирован.
-
-### ADR-002: Kafka для асинхронных событий
-
-**Контекст**: после создания заказа нужно зарезервировать остатки, но клиента не нужно заставлять ждать.
-
-**Решение**: один топик `order.created`, `inventory-service` слушает.
-
-**Альтернативы**:
-- RabbitMQ — отвергнут: нет replay событий, сложнее масштабировать consumer'ов
-- Делать резерв синхронно через gRPC — отвергнут: блокирует ответ пользователю, при сбое Inventory падает весь сценарий
-
-**Последствия**: добавляется eventual consistency (между созданием заказа и резервом есть лаг ~100ms), нужен Outbox для гарантии доставки, но zero coupling — Inventory может упасть, заказ всё равно создастся.
+### ADR-002: Kafka для асинхронности
+Гарантия доставки, replay, fan-out.
 
 ### ADR-003: DB per service
-
-**Решение**: каждый сервис имеет собственную PostgreSQL-схему (в проде — отдельный instance).
-
-**Альтернативы**:
-- Shared DB — отвергнуто: связанность по схеме, миграция одного сервиса ломает другой, общая точка отказа
-
-**Последствия**: нет JOIN между сервисами, нужны снепшоты данных (например, `product_name` в `order_items`), но сервисы независимы в развитии.
+Независимость сервисов, изоляция отказов.
 
 ### ADR-004: Redis для корзины
+TTL, O(1) операции, нет миграций.
 
-**Контекст**: корзина — это временные данные, читаются часто, не требуют сильной консистентности.
-
-**Решение**: Redis с TTL 24 часа, один ключ на пользователя.
-
-**Альтернативы**:
-- PostgreSQL — отвергнуто: лишние миграции, нужна задача чистки старых корзин
-- In-memory в сервисе — отвергнуто: теряется при рестарте пода
-
-**Последствия**: данные не персистентны (теряются при падении Redis), но MVP это устраивает — пользователь просто пересоберёт корзину.
-
-### ADR-005: Хореография (без оркестратора) для оформления заказа
-
-**Контекст**: создание заказа затрагивает 4 сервиса (Cart, User, Order, Inventory).
-
-**Решение**: `order-service` сам оркестрирует синхронные вызовы Cart и User, а Inventory подписан на Kafka. Без отдельного Saga-оркестратора.
-
-**Альтернативы**:
-- Saga Orchestrator (отдельный сервис) — отвергнуто: overkill для MVP, добавляет ещё один сервис без острой необходимости
-
-**Последствия**: логика заказа сосредоточена в `order-service`, что приемлемо для MVP. При росте сложности можно вынести в оркестратор.
+### ADR-005: Choreography Saga
+Хореография через события вместо центрального оркестратора.
 
 ### ADR-006: Outbox для надёжной публикации в Kafka
+Гарантия at-least-once доставки.
 
-**Контекст**: ситуация «заказ сохранён в БД, но Kafka недоступна» приведёт к рассинхрону.
+### ADR-007: Идемпотентность через order_id и audit_id
+Защита от повторной обработки.
 
-**Решение**: в одной транзакции с заказом записываем событие в таблицу `outbox`, отдельный воркер досылает в Kafka.
+### ADR-008: Отдельный admin-service вместо админских эндпоинтов в Gateway
 
-**Последствия**: гарантия at-least-once доставки, потребители должны быть идемпотентны (что они и есть благодаря `order_id`).
+**Контекст**: админские операции (начисление баллов, изменение каталога) опасны — ошибка в проверке прав = катастрофа.
 
-### ADR-007: Идемпотентность через order_id
+**Решение**: вынести админскую функциональность в отдельный сервис с собственной БД (audit_log) и NetworkPolicy.
 
-**Решение**: `DeductPoints` и `ReserveStock` идемпотентны по `order_id` (уникальный индекс в БД).
+**Альтернативы**:
+- Класть админские методы в Gateway — отвергнуто: смешивание ответственностей, общий код, риск ошибки в маршрутизации
 
-**Последствия**: можно безопасно retry'ить вызовы, повторный запрос с тем же `order_id` не приведёт к двойному списанию или резерву.
+**Последствия**: +1 сервис, но получаем изоляцию, audit, чёткую границу безопасности.
 
----
+### ADR-009: MinIO (S3) для фото товаров
 
-## 12. Что вне MVP — план v2
+**Контекст**: фото товаров нельзя хранить в БД или файловой системе подов.
 
-После запуска MVP и его стабилизации, следующие итерации:
+**Решение**: MinIO как S3-совместимое хранилище, presigned URL для загрузки напрямую из браузера.
 
-### v1.1 — Уведомления
-- `notification-service` (Kafka consumer)
-- Топики `notification.send` (универсальный) и `order.status_changed`
-- Каналы доставки: email (SMTP), Slack (webhook)
+**Альтернативы**:
+- Загрузка через сервис — отвергнуто: сервисы буферизуют файлы, нагрузка на CPU/RAM
+- AWS S3 / Yandex Object Storage — отвергнуто для MVP: лишняя зависимость от внешнего провайдера, но при необходимости можно переехать без изменений кода
 
-### v1.2 — Фулфилмент
-- `fulfillment-service` — интеграция со складом или типографией
-- Топик `order.confirmed`, статусы `in_production` → `shipped` → `delivered`
-- Webhook для обновлений от поставщика
-
-### v1.3 — Возвраты и история
-- `payment-service` как отдельный сервис с полной историей транзакций
-- Поток возврата: отмена → возврат баллов → снятие резерва остатков
-- UI истории баллов и заказов
-
-### v1.4 — Промокоды и скидки
-- `promo-service` для управления промокодами
-- Расширение `Order.CreateOrder` опциональным `promo_code`
-- Расчёт скидок в `order-service`
-
-### v1.5 — Аналитика и админка
-- Отдельный read-model в ClickHouse, populated через Kafka events
-- Дашборды для HR/PR: какие товары популярны, по отделам, по периодам
-- Админ-UI для управления каталогом и остатками
+**Последствия**: один Go-клиент (`minio-go`), легко поднимается локально и в k8s, при переезде в облако код не меняется.
 
 ---
 
-*Merch Store MVP Architecture v1.0 — документ актуален на 26.05.2026*
+*Merch Store MVP Architecture v1.1*
