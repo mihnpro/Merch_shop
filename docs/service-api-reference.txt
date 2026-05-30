@@ -1,0 +1,259 @@
+MERCH STORE
+API сервисов — основные методы и ручки
+
+Краткий справочник по gRPC-методам каждого сервиса.
+Без сигнатур protobuf, без полной структуры сообщений —
+только название, что делает, кто вызывает.
+
+Подробности контрактов смотри в proto/*/v1/*.proto.
+Подробности взаимодействий — в service-interactions.txt.
+
+
+════════════════════════════════════════════════════════════
+1. API GATEWAY
+════════════════════════════════════════════════════════════
+
+HTTP/REST-фасад. Это не gRPC-сервис, а HTTP-прокси
+с проверкой JWT и маршрутизацией в gRPC-сервисы.
+
+Публичные ручки (JWT не требуется):
+  POST /auth/register        → User.Register
+  POST /auth/login           → User.Login
+  POST /auth/refresh         → User.Refresh
+
+Пользовательские ручки (требуется JWT, role=user):
+  POST   /auth/logout            → User.Logout
+  POST   /auth/change-password   → User.ChangePassword
+  GET    /me                     → User.GetUser
+  GET    /me/balance             → User.GetBalance
+
+  GET    /products               → Product.ListProducts
+  GET    /products/{id}          → Product.GetProduct
+  GET    /products/{id}/stock    → Inventory.CheckStock
+
+  GET    /cart                   → Cart.GetCart
+  POST   /cart/items             → Cart.AddItem
+  PATCH  /cart/items/{id}        → Cart.UpdateItem
+  DELETE /cart/items/{id}        → Cart.RemoveItem
+  DELETE /cart                   → Cart.ClearCart
+
+  POST   /orders                 → Order.CreateOrder
+  GET    /orders                 → Order.ListUserOrders
+  GET    /orders/{id}            → Order.GetOrder
+
+Админские ручки доступны через тот же Gateway по маршрутам
+/admin/* и допускаются только при role=admin в JWT.
+Каждый доменный сервис дополнительно проверяет роль
+через общий интерцептор.
+
+
+════════════════════════════════════════════════════════════
+2. USER SERVICE
+════════════════════════════════════════════════════════════
+
+Регистрация, аутентификация, профиль, баланс баллов.
+
+Аутентификация (публичные):
+  Register         — создать учётку, вернуть пару токенов
+  Login            — войти по логину/паролю, вернуть пару
+  Refresh          — обменять refresh на новую пару
+  Logout           — отозвать refresh-токен
+
+Профиль:
+  GetUser          — данные текущего пользователя
+  ChangePassword   — сменить пароль (отзывает все refresh)
+
+Баланс и баллы:
+  GetBalance       — текущий баланс пользователя
+  DeductPoints     — списать баллы (идемпотентно по order_id)
+                     вызывает Order при оформлении
+  AddPoints        — начислить баллы (идемпотентно по
+                     operation_id). Вызывается при компенсации
+                     отмены заказа или при админском начислении
+
+Админские (требуется role=admin в JWT):
+  GrantPoints      — начислить баллы любому пользователю
+                     (идемпотентно по operation_id)
+  ResetPassword    — сгенерировать новый пароль, вернуть его
+  BlockUser        — пометить учётку заблокированной
+  ChangeRole       — повысить/понизить роль (user ↔ admin)
+  ListUsers        — список пользователей с поиском
+  GetTransactions  — история транзакций по баллам пользователя
+
+
+════════════════════════════════════════════════════════════
+3. PRODUCT SERVICE
+════════════════════════════════════════════════════════════
+
+Каталог товаров. Самый простой сервис.
+
+Read (доступ через Gateway):
+  ListProducts     — список с фильтром по category, пагинацией
+  GetProduct       — детали одного товара по id
+
+Write (требуется role=admin в JWT):
+  CreateProduct      — создать товар
+  UpdateProduct      — обновить поля товара
+  DeactivateProduct  — мягкое удаление (active=false)
+
+
+════════════════════════════════════════════════════════════
+4. CART SERVICE
+════════════════════════════════════════════════════════════
+
+Корзина пользователя. Postgres как источник истины +
+Redis-кеш.
+
+  GetCart          — получить корзину (Redis → fallback на Postgres)
+  AddItem          — добавить позицию (ходит в Product + Inventory)
+  UpdateItem       — изменить количество (с проверкой остатков)
+  RemoveItem       — удалить позицию
+  ClearCart        — очистить корзину (вызывается Order после
+                     оформления)
+
+Все методы принимают user_id из gRPC-метаданных (положил
+Gateway после проверки JWT).
+
+
+════════════════════════════════════════════════════════════
+5. ORDER SERVICE
+════════════════════════════════════════════════════════════
+
+Оформление и история заказов.
+
+Пользовательские:
+  CreateOrder      — оформить заказ. Внутри: GetCart →
+                     GetBalance → DeductPoints → INSERT
+                     orders + outbox → ClearCart
+  GetOrder         — детали заказа (проверяет, что заказ
+                     принадлежит пользователю)
+  ListUserOrders   — заказы текущего пользователя с фильтрами
+                     по статусу
+
+Системные (вызывает Inventory из Kafka-консьюмера):
+  UpdateStatus     — изменить статус заказа (pending →
+                     confirmed/cancelled). Если cancelled —
+                     запускает компенсацию: AddPoints +
+                     ReleaseReserve
+
+Админские (требуется role=admin в JWT):
+  ListAllOrders     — все заказы с фильтрами
+  ExportOrders      — выгрузка в Excel
+  AdminUpdateStatus — изменение статуса админом (ready/
+                      delivered/cancelled)
+  GetReports        — сводная аналитика (количество заказов,
+                      топ товаров, средний чек, регистрации)
+
+
+════════════════════════════════════════════════════════════
+6. INVENTORY SERVICE
+════════════════════════════════════════════════════════════
+
+Остатки и резервы.
+
+Read:
+  CheckStock       — наличие по product_id и (опционально)
+                     size. Вызывает Cart при AddItem/Update,
+                     браузер на странице товара.
+
+Write идемпотентные:
+  ReserveStock     — зарезервировать остатки под order_id.
+                     В MVP вызывается из Kafka-консьюмера,
+                     не через gRPC.
+  ReleaseReserve   — снять резерв (компенсация при отмене).
+                     Идемпотентно по order_id.
+  AdjustStock      — изменить остаток на delta. Требуется
+                     role=admin в JWT. Идемпотентно по
+                     operation_id.
+
+Kafka-consumer:
+  topic order.created — слушает события создания заказа,
+                        атомарно резервирует остатки
+
+
+════════════════════════════════════════════════════════════
+7. MEDIA SERVICE
+════════════════════════════════════════════════════════════
+
+Принимает загружаемые фото товаров от админа и пишет их
+в MinIO. Сам данные не хранит.
+
+Методы:
+  UploadPhoto         — принять файл фото (gRPC streaming
+                        или HTTP multipart), валидировать
+                        content-type (image/jpeg, png, webp)
+                        и размер (≤ 5 МБ), сгенерировать
+                        ключ products/{uuid}.{ext}, записать
+                        в MinIO через PutObject, вернуть
+                        photo_key. Требуется role=admin в JWT.
+
+
+════════════════════════════════════════════════════════════
+8. MinIO (S3-совместимое хранилище)
+════════════════════════════════════════════════════════════
+
+Не gRPC-сервис, а S3 API. Используются две операции:
+
+PutObject           — Media Service пишет загруженное фото
+                      в bucket merch-products. Ни один другой
+                      сервис и тем более браузер сетевого
+                      доступа на запись к MinIO не имеют
+                      (NetworkPolicy).
+GET object          — браузер пользователя/админа читает
+                      фото по публичной ссылке (bucket
+                      merch-products настроен на public-read).
+
+Bucket:
+  merch-products    — фото товаров, ключи вида
+                      products/{uuid}.{jpg|png|webp}
+
+
+════════════════════════════════════════════════════════════
+СВОДКА ПО ИДЕМПОТЕНТНОСТИ
+════════════════════════════════════════════════════════════
+
+Метод                       Ключ идемпотентности
+User.DeductPoints           order_id
+User.AddPoints              operation_id
+User.GrantPoints            operation_id
+Inventory.AdjustStock       operation_id
+Inventory.ReserveStock      order_id
+Inventory.ReleaseReserve    order_id
+Order.UpdateStatus          (order_id, status) — переход
+                            запрещён, если уже в этом
+                            статусе или в финальном
+
+
+════════════════════════════════════════════════════════════
+СВОДКА ПО ДОСТУПУ
+════════════════════════════════════════════════════════════
+
+Метод                            Кто может вызывать
+─────────────────────────────────────────────────────────
+*.Get* / *.List* (юзера)        Gateway (после JWT)
+Cart.*                           Gateway
+Order.CreateOrder/Get/List       Gateway
+Order.UpdateStatus               Inventory (системный)
+Order.ListAllOrders/Export/      Gateway (требуется role=admin)
+  AdminUpdateStatus/GetReports
+Product.Create/Update/Deactivate Gateway (требуется role=admin)
+User.AddPoints                   Order (компенсация) или
+                                 Gateway (role=admin при
+                                 ручном начислении)
+User.DeductPoints                Только Order
+User.Grant/Reset/Block/          Gateway (требуется role=admin)
+  ChangeRole/ListUsers
+Inventory.AdjustStock            Gateway (требуется role=admin)
+Inventory.ReserveStock           Только Kafka-consumer
+Inventory.ReleaseReserve         Только Order (компенсация)
+Media.UploadPhoto                Gateway (требуется role=admin)
+MinIO PUT/GET                    Браузер (public-read для GET)
+
+
+════════════════════════════════════════════════════════════
+
+Документ — справочник по MVP-версии API.
+Связанные документы:
+- service-interactions.txt — как сервисы общаются
+- README.md — архитектура и схемы данных
+- proto/*/v1/*.proto — формальные контракты
