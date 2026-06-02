@@ -1,0 +1,20 @@
+services:
+  gateway:
+    build:
+      context: ..
+      dockerfile: gateway/Dockerfile
+    restart: unless-stopped
+    environment:
+      HTTP_PORT: 8080
+      USER_SERVICE_ADDR: user_customer:50051
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
+    ports:
+      - "8080:8080"
+    networks:
+      - backend
+
+networks:
+  backend:
+    external: true
+    name: user_customer_default
