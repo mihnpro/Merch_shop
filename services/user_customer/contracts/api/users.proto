@@ -5,15 +5,10 @@ package users;
 import "google/protobuf/timestamp.proto";
 import "google/protobuf/empty.proto";
 
-option go_package = "github.com/mihnpro/Merch_Shop/services/user_customer/contracts;users";
+option go_package = "github.com/mihnpro/Merch_shop/services/user_customer/contracts/gen/go/userpb;userpb";
 
 // User Service — аутентификация, профиль, баланс баллов, админ-методы.
 service UserService {
-    rpc Register(RegisterRequest) returns (AuthResponse);
-    rpc Login(LoginRequest) returns (AuthResponse);
-    rpc Refresh(RefreshRequest) returns (TokenPair);
-    rpc Logout(LogoutRequest) returns (google.protobuf.Empty);
-
     rpc GetUser(google.protobuf.Empty) returns (User);
     rpc ChangePassword(ChangePasswordRequest) returns (google.protobuf.Empty);
 
