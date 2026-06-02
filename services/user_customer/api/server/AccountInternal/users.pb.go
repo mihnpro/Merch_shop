@@ -1652,7 +1652,7 @@ const file_users_proto_rawDesc = "" +
 	"\n" +
 	"ChangeRole\x12\x18.users.ChangeRoleRequest\x1a\v.users.User\x12>\n" +
 	"\tListUsers\x12\x17.users.ListUsersRequest\x1a\x18.users.ListUsersResponse\x12P\n" +
-	"\x0fGetTransactions\x12\x1d.users.GetTransactionsRequest\x1a\x1e.users.GetTransactionsResponseBUZSgithub.com/mihnpro/Merch_shop/services/user_customer/contracts/gen/go/userpb;userpbb\x06proto3"
+	"\x0fGetTransactions\x12\x1d.users.GetTransactionsRequest\x1a\x1e.users.GetTransactionsResponseBXZVgithub.com/mihnpro/Merch_shop/services/user_customer/api/server/AccountInternal;userpbb\x06proto3"
 
 var (
 	file_users_proto_rawDescOnce sync.Once
