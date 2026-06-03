@@ -15,38 +15,38 @@ import (
 	vo "github.com/mihnpro/Merch_shop/services/user_customer/internal/domain/valueobject"
 )
 
-type AuthQueryService interface {
+type AuthService interface {
 	Register(ctx context.Context, in dto.RegisterInput) (dto.UserView, error)
 	Login(ctx context.Context, in dto.LoginInput) (dto.AuthResult, error)
 	Refresh(ctx context.Context, refreshToken string) (port.TokenPair, error)
 	Logout(ctx context.Context, refreshToken string) error
 }
 
-type authQueryService struct {
+type authService struct {
 	users      repository.UserRepository
-	read       read.AuthReadService
+	query      query.AuthReadService
 	account    port.Account
 	tokens     port.TokenStore
 	refreshTTL time.Duration
 }
 
-func NewAuthQueryService(
+func NewAuthService(
 	users repository.UserRepository,
-	reader read.AuthReadService,
+	reader query.AuthReadService,
 	account port.Account,
 	tokens port.TokenStore,
 	refreshTTL time.Duration,
-) AuthQueryService {
-	return &authQueryService{
+) AuthService {
+	return &authService{
 		users:      users,
-		read:       reader,
+		query:      reader,
 		account:    account,
 		tokens:     tokens,
 		refreshTTL: refreshTTL,
 	}
 }
 
-func (s *authQueryService) Register(ctx context.Context, in dto.RegisterInput) (dto.UserView, error) {
+func (s *authService) Register(ctx context.Context, in dto.RegisterInput) (dto.UserView, error) {
 	login, err := vo.NewLogin(in.Login)
 	if err != nil {
 		return dto.UserView{}, err
@@ -91,12 +91,12 @@ func (s *authQueryService) Register(ctx context.Context, in dto.RegisterInput) (
 	return toUserView(user), nil
 }
 
-func (s *authQueryService) Login(ctx context.Context, in dto.LoginInput) (dto.AuthResult, error) {
+func (s *authService) Login(ctx context.Context, in dto.LoginInput) (dto.AuthResult, error) {
 	if strings.TrimSpace(in.Login) == "" || in.Password == "" {
 		return dto.AuthResult{}, domain.ErrInvalidCredentials
 	}
 
-	user, err := s.read.GetUserByLogin(ctx, in.Login)
+	user, err := s.query.GetUserByLogin(ctx, in.Login)
 	if err != nil {
 		if errors.Is(err, domain.ErrUserNotFound) {
 			return dto.AuthResult{}, domain.ErrInvalidCredentials
@@ -120,7 +120,7 @@ func (s *authQueryService) Login(ctx context.Context, in dto.LoginInput) (dto.Au
 	return dto.AuthResult{User: toUserView(user), Tokens: tokens}, nil
 }
 
-func (s *authQueryService) Refresh(ctx context.Context, refreshToken string) (port.TokenPair, error) {
+func (s *authService) Refresh(ctx context.Context, refreshToken string) (port.TokenPair, error) {
 	if strings.TrimSpace(refreshToken) == "" {
 		return port.TokenPair{}, domain.ErrInvalidInput
 	}
@@ -150,7 +150,7 @@ func (s *authQueryService) Refresh(ctx context.Context, refreshToken string) (po
 	return tokens, nil
 }
 
-func (s *authQueryService) Logout(ctx context.Context, refreshToken string) error {
+func (s *authService) Logout(ctx context.Context, refreshToken string) error {
 	if strings.TrimSpace(refreshToken) == "" {
 		return domain.ErrInvalidInput
 	}
