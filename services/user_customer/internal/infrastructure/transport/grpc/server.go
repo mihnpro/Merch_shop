@@ -6,10 +6,10 @@ import (
 )
 
 type GRPCServer struct {
-	service service.AuthQueryService
+	service service.AuthService
 	userpb.UnimplementedUserServiceServer
 }
 
-func NewGRPCServer(service service.AuthQueryService) *GRPCServer {
+func NewGRPCServer(service service.AuthService) *GRPCServer {
 	return &GRPCServer{service: service}
 }

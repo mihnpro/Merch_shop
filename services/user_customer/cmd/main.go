@@ -16,8 +16,8 @@ import (
 	"google.golang.org/grpc/reflection"
 
 	userpb "github.com/mihnpro/Merch_shop/services/user_customer/api/server/AccountInternal"
-	"github.com/mihnpro/Merch_shop/services/user_customer/internal/app/service"
 	"github.com/mihnpro/Merch_shop/services/user_customer/internal/app/query"
+	"github.com/mihnpro/Merch_shop/services/user_customer/internal/app/service"
 	"github.com/mihnpro/Merch_shop/services/user_customer/internal/infrastructure/account"
 	"github.com/mihnpro/Merch_shop/services/user_customer/internal/infrastructure/persistence"
 	psqlrepo "github.com/mihnpro/Merch_shop/services/user_customer/internal/infrastructure/repository/psql"
@@ -76,8 +76,8 @@ func main() {
 		refreshTokenTTL,
 	)
 
-	readSvc := read.NewAuthReadService(userRepo)
-	querySvc := service.NewAuthQueryService(userRepo, readSvc, acct, tokenStore, refreshTokenTTL)
+	readSvc := query.NewAuthReadService(userRepo)
+	querySvc := service.NewAuthService(userRepo, readSvc, acct, tokenStore, refreshTokenTTL)
 
 	grpcSrv := grpctransport.NewGRPCServer(querySvc)
 
