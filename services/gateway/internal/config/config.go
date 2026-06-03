@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/joho/godotenv"
@@ -18,6 +19,8 @@ type Config struct {
 	JWTRefreshSecret string
 
 	UserServiceAddr string
+
+	CORSAllowedOrigins []string
 }
 
 func Load() (*Config, error) {
@@ -33,6 +36,8 @@ func Load() (*Config, error) {
 		JWTRefreshSecret: os.Getenv("JWT_REFRESH_SECRET"),
 
 		UserServiceAddr: getEnv("USER_SERVICE_ADDR", "localhost:50051"),
+
+		CORSAllowedOrigins: getEnvList("CORS_ALLOWED_ORIGINS", []string{"*"}),
 	}
 
 	if cfg.JWTAccessSecret == "" {
@@ -49,6 +54,23 @@ func getEnv(key, def string) string {
 		return v
 	}
 	return def
+}
+
+func getEnvList(key string, def []string) []string {
+	v := os.Getenv(key)
+	if v == "" {
+		return def
+	}
+	var out []string
+	for _, p := range strings.Split(v, ",") {
+		if s := strings.TrimSpace(p); s != "" {
+			out = append(out, s)
+		}
+	}
+	if len(out) == 0 {
+		return def
+	}
+	return out
 }
 
 func getEnvDuration(key string, def time.Duration) time.Duration {

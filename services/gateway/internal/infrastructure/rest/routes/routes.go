@@ -17,5 +17,5 @@ func New(h *handlers.Server, mw *middleware.Middleware) http.Handler {
 
 	mux.Handle("GET /api/v1/me", mw.Auth(http.HandlerFunc(h.Me)))
 
-	return mux
+	return mw.CORS(mux)
 }
