@@ -9,5 +9,6 @@ FROM alpine:3.21
 RUN apk add --no-cache ca-certificates tzdata
 WORKDIR /app
 COPY --from=builder /bin/gateway .
+COPY --from=builder /app/config.yaml .
 EXPOSE 8080
 CMD ["./gateway"]

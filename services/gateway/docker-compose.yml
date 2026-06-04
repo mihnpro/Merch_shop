@@ -6,9 +6,10 @@ services:
     restart: unless-stopped
     environment:
       HTTP_PORT: 8080
-      GATEWAY_ROUTES: /api/v1/auth=http://user:8081,/api/v1/me=http://user:8081
-      GATEWAY_PUBLIC_PREFIXES: /api/v1/auth/login,/api/v1/auth/register,/api/v1/auth/refresh
+      GATEWAY_CONFIG: /etc/gateway/config.yaml
       JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET}
+    volumes:
+      - ./config.yaml:/etc/gateway/config.yaml:ro
     ports:
       - "8080:8080"
     networks:
