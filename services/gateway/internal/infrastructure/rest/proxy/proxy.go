@@ -11,17 +11,24 @@ import (
 	"github.com/mihnpro/Merch_shop/services/gateway/internal/infrastructure/config"
 )
 
+
+type Authorizer interface {
+	Authorize(w http.ResponseWriter, r *http.Request) bool
+}
+
 type route struct {
 	prefix string
+	public bool
 	proxy  *httputil.ReverseProxy
 }
 
 type Proxy struct {
 	routes []route
+	authz  Authorizer
 }
 
-func New(routes []config.Route) (*Proxy, error) {
-	p := &Proxy{}
+func New(routes []config.Route, authz Authorizer) (*Proxy, error) {
+	p := &Proxy{authz: authz}
 	for _, r := range routes {
 		target, err := url.Parse(r.Target)
 		if err != nil {
@@ -29,6 +36,7 @@ func New(routes []config.Route) (*Proxy, error) {
 		}
 		p.routes = append(p.routes, route{
 			prefix: r.Prefix,
+			public: r.Public,
 			proxy:  httputil.NewSingleHostReverseProxy(target),
 		})
 	}
@@ -41,7 +49,9 @@ func New(routes []config.Route) (*Proxy, error) {
 func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	for _, rt := range p.routes {
 		if strings.HasPrefix(r.URL.Path, rt.prefix) {
-			rt.proxy.ServeHTTP(w, r)
+			if rt.public || p.authz.Authorize(w, r) {
+				rt.proxy.ServeHTTP(w, r)
+			}
 			return
 		}
 	}

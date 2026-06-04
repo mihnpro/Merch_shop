@@ -8,5 +8,5 @@ import (
 )
 
 func New(mw *middleware.Middleware, p *proxy.Proxy) http.Handler {
-	return mw.CORS(mw.Auth(p))
+	return mw.CORS(p)
 }
