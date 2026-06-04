@@ -1,0 +1,21 @@
+services:
+  gateway:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      HTTP_PORT: 8080
+      GATEWAY_CONFIG: /etc/gateway/config.yaml
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET}
+    volumes:
+      - ./config.yaml:/etc/gateway/config.yaml:ro
+    ports:
+      - "8080:8080"
+    networks:
+      - backend
+
+networks:
+  backend:
+    external: true
+    name: user_default
