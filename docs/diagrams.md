@@ -298,7 +298,7 @@ erDiagram
         uuid id PK
         text login
         text password_hash
-        text role
+        enum role
         enum status
     }
     POINTS_BALANCE {

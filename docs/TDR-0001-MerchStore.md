@@ -755,6 +755,14 @@ R — просмотр (read), W — изменение (write), `—` — не�
 
 ```mermaid
 erDiagram
+    ROLES {
+        uuid id PK
+        text code UK
+        text name
+        text description
+        timestamptz created_at
+        timestamptz updated_at
+    }
     USERS {
         uuid id PK
         text login UK
@@ -764,7 +772,7 @@ erDiagram
         text patronymic
         text email
         text phone_number
-        text role
+        uuid role_id FK
         user_status status
         int failed_login_count
         timestamptz locked_until
@@ -787,6 +795,7 @@ erDiagram
         timestamptz created_at
     }
 
+    ROLES        ||--o{ USERS               : "1:N"
     USERS        ||--|| POINTS_BALANCE      : "1:1"
     USERS        ||--o{ POINTS_TRANSACTIONS : "1:N"
 ```
@@ -803,7 +812,7 @@ erDiagram
 | `patronymic` | `TEXT` | `NULL` допустим, `CHECK length BETWEEN 1 AND 100` | Отчество; может отсутствовать (иностранные сотрудники) |
 | `email` | `TEXT` | `NULL` допустим, `CHECK email ~* '^[^@]+@[^@]+\\.[^@]+$'` | На будущее — для уведомлений |
 | `phone_number` | `TEXT` | `NULL` допустим, `CHECK phone_number ~ '^\+?[1-9][0-9]{6,14}$'` | E.164-формат (`+7XXXXXXXXXX`) |
-| `role` | `TEXT` | `NOT NULL`, default `'user'`, `CHECK role IN ('user','admin')` | Роль пользователя (см. §17.1.5) |
+| `role_id` | `UUID` | `NOT NULL`, `FK → roles(id) ON DELETE RESTRICT` | Роль пользователя (см. §17.1.5) |
 | `status` | `user_status` (enum) | `NOT NULL`, default `'active'` | См. ниже **Значения `status`** |
 | `failed_login_count` | `INT` | `NOT NULL`, default `0`, `CHECK >= 0` | Счётчик неудачных подряд попыток входа; сбрасывается при успешном входе |
 | `locked_until` | `TIMESTAMPTZ` | `NULL` допустим | До какого момента вход запрещён (rate-limit на 5 минут после 5 неудачных попыток) |
@@ -842,16 +851,27 @@ erDiagram
 | `reason` | `TEXT` | `NOT NULL`, `CHECK length BETWEEN 1 AND 500` | Человекочитаемая причина (бизнес-требование для аудита и для отображения в истории операций) |
 | `created_at` | `TIMESTAMPTZ` | `NOT NULL`, default `NOW()` | Когда зафиксирована |
 
-##### 17.1.5 Роль (`users.role`)
+##### 17.1.5 `roles`
 
-Роль хранится прямо в колонке `users.role` как строковый код, без отдельной таблицы-справочника. В MVP допустимы ровно два значения, что фиксируется ограничением `CHECK (role IN ('user','admin'))`; при регистрации роль выставляется в `user` (default). Для добавления новой роли в будущем (например, `super_admin`, `auditor`, `viewer`) достаточно расширить `CHECK`-ограничение миграцией — отдельная таблица не нужна, пока с ролью не связаны дополнительные атрибуты.
+Справочник ролей. В MVP создаётся seed-миграцией с двумя записями (`user`, `admin`); таблица позволяет в будущем добавлять новые роли (например, `super_admin`, `auditor`, `viewer`) без миграции PostgreSQL-типа `ENUM`.
 
-| Код | Назначение |
-|---|---|
-| `user` | Сотрудник: каталог, своя корзина, свои заказы, свой баланс. Выставляется автоматически при регистрации. |
-| `admin` | Администратор: всё, что может сотрудник, плюс управление каталогом, остатками, начисление баллов, управление пользователями и заказами. |
+| Поле | Тип | Ограничения | Описание |
+|---|---|---|---|
+| `id` | `UUID` | `PK`, default `gen_random_uuid()` | Идентификатор роли |
+| `code` | `TEXT` | `NOT NULL`, `UNIQUE`, `CHECK ~ '^[a-z_]{1,30}$'` | Машинный код роли (используется в JWT-claim и в коде интерсептора `pkg/auth`): `user`, `admin` |
+| `name` | `TEXT` | `NOT NULL`, `CHECK length BETWEEN 1 AND 100` | Отображаемое название («Сотрудник», «Администратор») |
+| `description` | `TEXT` | `NULL` допустим, `CHECK length <= 500` | Развёрнутое описание прав роли (для админ-панели) |
+| `created_at` | `TIMESTAMPTZ` | `NOT NULL`, default `NOW()` | |
+| `updated_at` | `TIMESTAMPTZ` | `NOT NULL`, default `NOW()` | |
 
-**Проверка роли:** интерсептор `pkg/auth.AdminOnly` сравнивает JWT-claim `role` со строковым кодом. Сервис User кладёт в JWT `role: users.role` при логине; остальные сервисы доверяют этому значению.
+**Seed (выполняется один раз при первичной настройке):**
+
+| `code` | `name` | `description` |
+|---|---|---|
+| `user` | Сотрудник | Может просматривать каталог, управлять своей корзиной, оформлять заказы, видеть свои заказы и баланс. |
+| `admin` | Администратор | Всё, что может сотрудник, плюс управление каталогом, остатками, начисление баллов, управление пользователями и заказами. |
+
+**Что меняется в проверке роли:** интерсептор `pkg/auth.AdminOnly` сравнивает JWT-claim `role` со строковым кодом из `roles.code`, а не с PostgreSQL-enum-значением. Сервис User кладёт в JWT `role: roles.code` при логине; остальные сервисы доверяют этому значению (как и раньше).
 
 ---
 
