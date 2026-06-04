@@ -27,9 +27,9 @@ func main() {
 	}
 
 	verifier := account.NewVerifier(cfg.JWTAccessSecret)
-	mw := middleware.NewMiddleware(logger, verifier, cfg.PublicPrefixes, cfg.CORSAllowedOrigins)
+	mw := middleware.NewMiddleware(logger, verifier, cfg.CORSAllowedOrigins)
 
-	p, err := proxy.New(cfg.Routes)
+	p, err := proxy.New(cfg.Routes, mw)
 	if err != nil {
 		logger.Fatal("failed to build proxy", zap.Error(err))
 	}

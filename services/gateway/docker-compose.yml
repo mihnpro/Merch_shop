@@ -1,14 +1,14 @@
 services:
   gateway:
     build:
-      context: ..
-      dockerfile: gateway/Dockerfile
+      context: .
+      dockerfile: Dockerfile
     restart: unless-stopped
     environment:
       HTTP_PORT: 8080
-      USER_SERVICE_ADDR: user_customer:50051
+      GATEWAY_ROUTES: /api/v1/auth=http://user:8081,/api/v1/me=http://user:8081
+      GATEWAY_PUBLIC_PREFIXES: /api/v1/auth/login,/api/v1/auth/register,/api/v1/auth/refresh
       JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET}
-      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
     ports:
       - "8080:8080"
     networks:
@@ -17,4 +17,4 @@ services:
 networks:
   backend:
     external: true
-    name: user_customer_default
+    name: user_default
