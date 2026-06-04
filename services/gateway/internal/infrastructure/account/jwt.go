@@ -9,6 +9,8 @@ import (
 	"github.com/mihnpro/Merch_shop/services/gateway/internal/app/port"
 )
 
+var errInvalidToken = errors.New("invalid token")
+
 type verifier struct {
 	accessSecret []byte
 }
@@ -30,12 +32,12 @@ func (v *verifier) VerifyAccess(token string) error {
 		return v.accessSecret, nil
 	}, jwt.WithValidMethods([]string{"HS256"}))
 	if err != nil || !tok.Valid {
-		return errors.New("invalid token")
+		return errInvalidToken
 	}
 
 	rc, ok := tok.Claims.(*rawClaims)
 	if !ok || rc.TokenType != "access" {
-		return errors.New("invalid token")
+		return errInvalidToken
 	}
 	return nil
 }
