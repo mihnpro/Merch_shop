@@ -8,47 +8,39 @@ import (
 
 const bearerPrefix = "Bearer "
 
-func (m *Middleware) Auth(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if m.isPublic(r.URL.Path) {
-			next.ServeHTTP(w, r)
-			return
-		}
+func (m *Middleware) Authorize(w http.ResponseWriter, r *http.Request) bool {
+	token, ok := bearerToken(r)
+	if !ok {
+		unauthorized(w)
+		return false
+	}
 
-		h := r.Header.Get("Authorization")
-		if !strings.HasPrefix(h, bearerPrefix) {
-			unauthorized(w)
-			return
-		}
-		token := strings.TrimSpace(strings.TrimPrefix(h, bearerPrefix))
-		if token == "" {
-			unauthorized(w)
-			return
-		}
+	if err := m.verify.VerifyAccess(token); err != nil {
+		unauthorized(w)
+		return false
+	}
 
-		if err := m.verify.VerifyAccess(token); err != nil {
-			unauthorized(w)
-			return
-		}
-
-		next.ServeHTTP(w, r)
-	})
+	return true
 }
 
-func (m *Middleware) isPublic(path string) bool {
-	for _, p := range m.publicPrefixes {
-		if strings.HasPrefix(path, p) {
-			return true
-		}
+func bearerToken(r *http.Request) (string, bool) {
+	h := r.Header.Get("Authorization")
+	if !strings.HasPrefix(h, bearerPrefix) {
+		return "", false
 	}
-	return false
+	token := strings.TrimSpace(strings.TrimPrefix(h, bearerPrefix))
+	return token, token != ""
 }
 
 func unauthorized(w http.ResponseWriter) {
+	writeError(w, http.StatusUnauthorized, "UNAUTHENTICATED", "unauthenticated")
+}
+
+func writeError(w http.ResponseWriter, status int, code, message string) {
 	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusUnauthorized)
+	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(map[string]string{
-		"code":    "UNAUTHENTICATED",
-		"message": "unauthenticated",
+		"code":    code,
+		"message": message,
 	})
 }

@@ -7,17 +7,15 @@ import (
 )
 
 type Middleware struct {
-	log            *zap.Logger
-	verify         port.Verifier
-	publicPrefixes []string
-	corsOrigins    []string
+	log         *zap.Logger
+	verify      port.Verifier
+	corsOrigins []string
 }
 
-func NewMiddleware(log *zap.Logger, verify port.Verifier, publicPrefixes, corsOrigins []string) *Middleware {
+func NewMiddleware(log *zap.Logger, verify port.Verifier, corsOrigins []string) *Middleware {
 	return &Middleware{
-		log:            log,
-		verify:         verify,
-		publicPrefixes: publicPrefixes,
-		corsOrigins:    corsOrigins,
+		log:         log,
+		verify:      verify,
+		corsOrigins: corsOrigins,
 	}
 }
