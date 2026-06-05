@@ -1,5 +1,6 @@
 services:
   user: http://user:8081
+  product: http://product:8082
 
 routes:
   - prefix: /api/v1/auth/*
@@ -7,3 +8,15 @@ routes:
     public: true
   - prefix: /api/v1/me
     service: user
+
+
+  - prefix: /api/v1/products
+    service: product
+  - prefix: /api/v1/categories
+    service: product
+
+
+  - prefix: /api/v1/admin/products
+    service: product
+  - prefix: /api/v1/admin/categories
+    service: product
