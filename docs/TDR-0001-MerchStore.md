@@ -857,7 +857,7 @@ erDiagram
 
 #### 17.2 Product Service DB
 
-В этом сервисе появились две новые справочные таблицы (`categories`, `sizes`) и связь M:N (`product_sizes`) — устраняем нарушения 1NF, бывшие в `products.category TEXT` и `products.sizes TEXT[]`.
+В этом сервисе появилась справочная таблица `categories` (нормализует прежний `products.category TEXT`). Размеры товара хранятся необязательным массивом `products.sizes TEXT[]` — осознанная денормализация (см. §17.8.2): отдельного справочника размеров и связи M:N нет.
 
 ##### 17.2.1 ER-диаграмма
 
@@ -871,32 +871,21 @@ erDiagram
         timestamptz created_at
         timestamptz updated_at
     }
-    SIZES {
-        uuid id PK
-        text code UK
-        timestamptz created_at
-    }
     PRODUCTS {
         uuid id PK
         text name
         text description
         bigint price_points
         uuid category_id FK
+        text[] sizes
         text photo_key
         bool active
         int version
         timestamptz created_at
         timestamptz updated_at
     }
-    PRODUCT_SIZES {
-        uuid product_id PK,FK
-        uuid size_id PK,FK
-        timestamptz created_at
-    }
 
-    CATEGORIES   ||--o{ PRODUCTS      : "1:N"
-    PRODUCTS     ||--o{ PRODUCT_SIZES : "1:N"
-    SIZES        ||--o{ PRODUCT_SIZES : "1:N"
+    CATEGORIES   ||--o{ PRODUCTS : "1:N"
 ```
 
 ##### 17.2.2 `categories`
@@ -910,15 +899,7 @@ erDiagram
 | `created_at` | `TIMESTAMPTZ` | `NOT NULL`, default `NOW()` | |
 | `updated_at` | `TIMESTAMPTZ` | `NOT NULL`, default `NOW()` | |
 
-##### 17.2.3 `sizes` (мастер-справочник)
-
-| Поле | Тип | Ограничения | Описание |
-|---|---|---|---|
-| `id` | `UUID` | `PK` | Идентификатор размера |
-| `code` | `TEXT` | `NOT NULL`, `UNIQUE`, `CHECK ~ '^[A-Z0-9]{1,10}$'` | `XS`, `S`, `M`, `L`, `XL`, `XXL`, `ONESIZE` |
-| `created_at` | `TIMESTAMPTZ` | `NOT NULL`, default `NOW()` | |
-
-##### 17.2.4 `products`
+##### 17.2.3 `products`
 
 | Поле | Тип | Ограничения | Описание |
 |---|---|---|---|
@@ -927,19 +908,12 @@ erDiagram
 | `description` | `TEXT` | `CHECK length <= 2000` | Описание |
 | `price_points` | `BIGINT` | `NOT NULL`, `CHECK > 0` | Цена в баллах |
 | `category_id` | `UUID` | `NOT NULL`, `FK → categories(id) ON DELETE RESTRICT` | Категория |
+| `sizes` | `TEXT[]` | `NOT NULL`, default `'{}'`, без `NULL`-элементов | Необязательный набор кодов размеров (`XS`, `S`, `M`, …); отдельного справочника нет |
 | `photo_key` | `TEXT` | `NULL` до загрузки фото; затем `NOT NULL` (валидация на уровне приложения) | Ключ объекта в MinIO |
 | `active` | `BOOLEAN` | `NOT NULL`, default `TRUE` | Мягкая деактивация |
 | `version` | `INT` | `NOT NULL`, default `1` | Оптимистическая блокировка |
 | `created_at` | `TIMESTAMPTZ` | `NOT NULL`, default `NOW()` | |
 | `updated_at` | `TIMESTAMPTZ` | `NOT NULL`, default `NOW()` | |
-
-##### 17.2.5 `product_sizes` (M:N)
-
-| Поле | Тип | Ограничения | Описание |
-|---|---|---|---|
-| `product_id` | `UUID` | `PK` (составной), `FK → products(id) ON DELETE CASCADE` | Товар |
-| `size_id` | `UUID` | `PK` (составной), `FK → sizes(id) ON DELETE RESTRICT` | Размер |
-| `created_at` | `TIMESTAMPTZ` | `NOT NULL`, default `NOW()` | Когда размер привязан к товару |
 
 ---
 
@@ -1156,7 +1130,6 @@ erDiagram
 | Product | `products` | `products_category_active_idx` | Частичный B-tree `(category_id) WHERE active` | Фильтр каталога по категории |
 | Product | `products` | `products_active_created_idx` | Частичный B-tree `(created_at DESC) WHERE active` | Сортировка «новые сверху» |
 | Product | `products` | `products_name_fts_idx` | GIN `to_tsvector('simple', name)` | Полнотекстовый поиск по названию |
-| Product | `product_sizes` | `product_sizes_size_idx` | B-tree `(size_id)` | Запросы «в каких товарах есть размер X» |
 | Order | `orders` | `orders_status_idx` | B-tree `(status)` | Фильтр в админских списках |
 | Order | `orders` | `orders_user_created_idx` | B-tree `(user_id, created_at DESC)` | История заказов пользователя |
 | Order | `order_items` | `order_items_order_idx` | B-tree `(order_id)` | Подгрузка позиций заказа |
@@ -1198,7 +1171,7 @@ PK-индексы (`PRIMARY KEY`) и UNIQUE-индексы непосредст�
 
 ##### 17.8.1 Таблицы, соответствующие 3NF
 
-`users`, `points_balance`, `points_transactions`, `categories`, `sizes`, `product_sizes`, `products`, `carts`, `orders`, `outbox`, `stock` — все атрибуты атомарны, каждый неключевой атрибут функционально зависит только от первичного ключа, транзитивных зависимостей нет.
+`users`, `points_balance`, `points_transactions`, `categories`, `carts`, `orders`, `outbox`, `stock` — все атрибуты атомарны, каждый неключевой атрибут функционально зависит только от первичного ключа, транзитивных зависимостей нет.
 
 ##### 17.8.2 Обоснованные отступления
 
@@ -1232,6 +1205,19 @@ PK-индексы (`PRIMARY KEY`) и UNIQUE-индексы непосредст�
 - Усложняет идемпотентность ReserveStock (нужно убедиться, что весь набор позиций совпадает с уже существующим).
 - Усложняет ReleaseReserve, поскольку придётся дополнительно блокировать FK-связь.
 - Не даёт выигрыша на ожидаемом потоке (< 0.1 RPS на топик `order.created`).
+
+###### Отступление 4. `products.sizes TEXT[]` — нарушение 1NF (не атомарный атрибут)
+
+**Что нарушается.** Столбец `sizes` хранит массив кодов размеров — это не атомарное значение.
+
+**Зачем оставлено.** Набор размеров — необязательный описательный атрибут товара, который всегда читается и пишется целиком вместе с карточкой. Размеры не являются самостоятельной сущностью со своими атрибутами и жизненным циклом; справочника размеров нет, валидных значений немного, и они не переиспользуются между сервисами по ссылке (Cart/Inventory/Order оперируют `size_code` как строкой).
+
+**Дополнительные мотивы:**
+- `CreateProduct`/`UpdateProduct` — одна запись строки `products` вместо вставки/пересборки N строк связи `product_sizes`.
+- `GetProduct`/`ListProducts` не требуют JOIN и агрегации размеров — массив читается вместе с товаром.
+- Каталог фильтрует по размеру через `sizes @> ARRAY['M']` (при необходимости — GIN-индекс по `sizes`).
+
+**Альтернатива и почему отвергнута.** Справочник `sizes` + связь M:N `product_sizes` — строго 1NF/3NF. Отвергнута: вводит две таблицы и JOIN-ы ради атрибута без собственного поведения; на ожидаемом масштабе каталога выигрыша целостности не даёт, а сложность создания/редактирования товара растёт.
 
 ### 18. Зависимости сервисов
 
