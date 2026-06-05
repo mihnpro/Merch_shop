@@ -3,7 +3,7 @@ services:
     image: postgres:17-alpine
     restart: unless-stopped
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-merch_service}
+      POSTGRES_DB: ${POSTGRES_DB:-merch_users}
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     ports:
@@ -11,7 +11,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-merch_service}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-merch_users}"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -36,7 +36,7 @@ services:
         host=postgres port=5432
         user=${POSTGRES_USER:-postgres}
         password=${POSTGRES_PASSWORD}
-        dbname=${POSTGRES_DB:-merch_service}
+        dbname=${POSTGRES_DB:-merch_users}
         sslmode=disable
     volumes:
       - ./migrations:/migrations
@@ -44,7 +44,7 @@ services:
       postgres:
         condition: service_healthy
 
-  service:
+  user:
     build:
       context: .
       dockerfile: Dockerfile
@@ -54,16 +54,17 @@ services:
       POSTGRES_PORT: 5432
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB:-merch_service}
+      POSTGRES_DB: ${POSTGRES_DB:-merch_users}
       POSTGRES_SSLMODE: disable
       REDIS_HOST: redis
       REDIS_PORT: 6379
       REDIS_PASSWORD: ${REDIS_PASSWORD}
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
       GRPC_PORT: ${GRPC_PORT:-50051}
       HTTP_PORT: ${HTTP_PORT:-8081}
     ports:
       - "${GRPC_PORT:-50051}:50051"
-      - "${HTTP_PORT:-8081}:8081"
     depends_on:
       postgres:
         condition: service_healthy
