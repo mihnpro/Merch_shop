@@ -2,16 +2,8 @@ services:
   user: http://user:8081
 
 routes:
-  - prefix: /api/v1/auth/login
+  - prefix: /api/v1/auth/*
     service: user
     public: true
-  - prefix: /api/v1/auth/register
-    service: user
-    public: true
-  - prefix: /api/v1/auth/refresh
-    service: user
-    public: true
-  - prefix: /api/v1/auth
-    service: user
   - prefix: /api/v1/me
     service: user
