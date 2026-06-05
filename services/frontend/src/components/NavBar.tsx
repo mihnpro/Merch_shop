@@ -12,7 +12,6 @@ export default function NavBar() {
     try {
       if (refreshToken) await logout(refreshToken);
     } catch {
-
     } finally {
       clearTokens();
       navigate("/login");
