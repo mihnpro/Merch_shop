@@ -1,0 +1,50 @@
+services:
+  minio:
+    image: minio/minio:latest
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:-minioadmin}
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  media:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET}
+      HTTP_PORT: ${HTTP_PORT:-8083}
+      GRPC_PORT: ${GRPC_PORT:-50051}
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-minioadmin}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-minioadmin}
+      MINIO_BUCKET: ${MINIO_BUCKET:-merch-products}
+      MINIO_USE_SSL: "false"
+    ports:
+      - "${HTTP_PORT:-8083}:8083"
+      - "${GRPC_HOST_PORT:-50053}:50051"
+    depends_on:
+      minio:
+        condition: service_healthy
+    networks:
+      - default
+      - backend
+
+volumes:
+  minio_data:
+
+networks:
+  backend:
+    external: true
+    name: user_default
