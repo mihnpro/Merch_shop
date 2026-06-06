@@ -17,6 +17,33 @@ export async function request<T>(
 
   const response = await fetch(`${BASE_URL}${path}`, { ...options, headers });
 
+  return parseResponse<T>(response);
+}
+
+export async function uploadFile<T>(
+  path: string,
+  file: File,
+  field = "file",
+): Promise<T> {
+  const form = new FormData();
+  form.append(field, file);
+
+  const headers = new Headers();
+  const token = getAccessToken();
+  if (token) {
+    headers.set("Authorization", `Bearer ${token}`);
+  }
+
+  const response = await fetch(`${BASE_URL}${path}`, {
+    method: "POST",
+    body: form,
+    headers,
+  });
+
+  return parseResponse<T>(response);
+}
+
+async function parseResponse<T>(response: Response): Promise<T> {
   const text = await response.text();
   const data = text ? JSON.parse(text) : undefined;
 
