@@ -31,9 +31,9 @@ message Product {
     string description  = 3;
     int64  price_points = 4;                 
     Category category   = 5;                 
-    repeated string sizes = 6;               
-    string photo_key    = 7;                 
-    bool   active       = 8;                 
+    repeated string sizes = 6;
+    repeated string photo_keys = 7;
+    bool   active       = 8;
     int32  version      = 9;                 
     google.protobuf.Timestamp created_at = 10;
     google.protobuf.Timestamp updated_at = 11;
@@ -76,8 +76,8 @@ message CreateProductRequest {
     string description     = 2;
     int64  price_points   = 3;               
     string category_id    = 4;
-    repeated string sizes = 5;               
-    string photo_key      = 6;
+    repeated string sizes = 5;
+    repeated string photo_keys = 6;
 }
 
 // Обновление товара админом. Идёт с version для оптимистической блокировки
@@ -88,9 +88,9 @@ message UpdateProductRequest {
     int64  price_points   = 4;
     string category_id    = 5;
     repeated string sizes = 6;
-    string photo_key      = 7;
+    repeated string photo_keys = 7;
     int32  version        = 8;
-    bool   active         = 9;               // статус товара (true — активен, false — скрыт)
+    bool   active         = 9;        
 }
 
 // Деактивация товара (soft-delete).
