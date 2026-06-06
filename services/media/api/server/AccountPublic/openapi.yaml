@@ -1,0 +1,106 @@
+openapi: 3.0.3
+info:
+  title: Media Service — Public API
+  description: >-
+    Публичные HTTP-эндпоинты media-сервиса, доступные клиентам через gateway.
+    Сервис принимает загружаемые фото товаров (multipart/form-data), валидирует
+    формат и размер, пишет файл в MinIO и возвращает photo_key. Загрузка
+    требует роль admin. Эквивалентный gRPC-контракт (client-streaming) описан в
+    ../AccountInternal/media.proto.
+  version: 1.0.0
+
+servers:
+  - url: /api/v1
+    description: Базовый префикс (gateway проксирует по нему в media-сервис)
+
+tags:
+  - name: admin
+    description: Загрузка фото товаров (только role=admin)
+
+paths:
+  /admin/media/photos:
+    post:
+      tags: [admin]
+      summary: Загрузить фото товара
+      description: >-
+        Принимает один файл изображения в поле `file`. Допустимые типы —
+        image/jpeg, image/png, image/webp; размер ≤ 5 МБ (жёсткий лимит тела
+        запроса — 6 МБ). Сервис генерирует ключ `products/{uuid}.{ext}`,
+        стримит файл в MinIO без полной буферизации и возвращает photo_key,
+        который затем передаётся в Product.CreateProduct.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Файл изображения (image/jpeg | image/png | image/webp), ≤ 5 МБ
+      responses:
+        "200":
+          description: Файл загружен
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UploadPhotoResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/StorageUnavailable"
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  responses:
+    BadRequest:
+      description: >-
+        Некорректный запрос: неподдерживаемый content-type, файл больше 5 МБ,
+        пустой файл или отсутствует поле `file`.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    Unauthorized:
+      description: Отсутствует или невалиден access-токен
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    Forbidden:
+      description: Недостаточно прав (требуется role=admin)
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    StorageUnavailable:
+      description: Объектное хранилище недоступно, запись не выполнена
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+
+  schemas:
+    UploadPhotoResponse:
+      type: object
+      properties:
+        photo_key:
+          type: string
+          description: Ключ объекта в MinIO, например "products/{uuid}.jpg"
+          example: products/8f14e45f-ceea-467f-9f5e-2a3b4c5d6e7f.jpg
+
+    Error:
+      type: object
+      properties:
+        code: { type: string }
+        message: { type: string }
+
+security:
+  - bearerAuth: []
