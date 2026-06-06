@@ -3,6 +3,7 @@ import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
 import ProfilePage from "./pages/ProfilePage";
 import CatalogPage from "./pages/CatalogPage";
+import ProductDetailPage from "./pages/ProductDetailPage";
 import AdminPage from "./pages/AdminPage";
 import ProtectedRoute from "./components/ProtectedRoute";
 import AdminRoute from "./components/AdminRoute";
@@ -18,6 +19,14 @@ export default function App() {
         element={
           <ProtectedRoute>
             <CatalogPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/catalog/:id"
+        element={
+          <ProtectedRoute>
+            <ProductDetailPage />
           </ProtectedRoute>
         }
       />

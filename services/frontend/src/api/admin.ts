@@ -1,4 +1,4 @@
-import { request } from "./client";
+import { request, uploadFile } from "./client";
 import type {
   Category,
   CreateCategoryInput,
@@ -6,7 +6,12 @@ import type {
   ProductInput,
   UpdateCategoryInput,
   UpdateProductInput,
+  UploadPhotoResponse,
 } from "./types";
+
+export function uploadPhoto(file: File): Promise<UploadPhotoResponse> {
+  return uploadFile<UploadPhotoResponse>("/admin/media/photos", file);
+}
 
 export function createProduct(body: ProductInput): Promise<Product> {
   return request<Product>("/admin/products", {

@@ -128,9 +128,9 @@ button:disabled {
 .page {
   align-self: flex-start;
   width: 100%;
-  max-width: 1000px;
+  max-width: none;
   margin: 24px auto;
-  padding: 0 16px;
+  padding: 0 24px;
 }
 
 .page h1 {
@@ -225,10 +225,20 @@ select {
 }
 
 .product-card {
+  display: block;
   background: #fff;
   border-radius: 12px;
   padding: 16px;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
+  color: inherit;
+  text-decoration: none;
+  cursor: pointer;
+  transition: box-shadow 0.15s, transform 0.15s;
+}
+
+a.product-card:hover {
+  box-shadow: 0 6px 26px rgba(0, 0, 0, 0.12);
+  transform: translateY(-2px);
 }
 
 .product-card h3 {
@@ -245,6 +255,170 @@ select {
   border-radius: 8px;
   color: #9aa0a6;
   font-size: 14px;
+  overflow: hidden;
+}
+
+.product-photo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.photo-upload {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.photo-upload-label {
+  font-size: 13px;
+  color: #444;
+}
+
+.photo-dropzone {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  min-height: 96px;
+  padding: 16px;
+  border: 2px dashed #c4c9d4;
+  border-radius: 8px;
+  background: #fafbfc;
+  color: #6b7280;
+  font-size: 14px;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.photo-dropzone:hover {
+  border-color: #4a90d9;
+}
+
+.photo-dropzone.is-dragover {
+  border-color: #4a90d9;
+  background: #eef5fc;
+  color: #2c6cb0;
+}
+
+.photo-thumbs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.photo-thumb {
+  position: relative;
+  width: 88px;
+  height: 88px;
+}
+
+.photo-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid #e2e5ea;
+}
+
+.photo-thumb-badge {
+  position: absolute;
+  left: 4px;
+  bottom: 4px;
+  padding: 1px 6px;
+  font-size: 11px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+}
+
+.photo-thumb-remove {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border-radius: 50%;
+  border: none;
+  background: #d14343;
+  color: #fff;
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+/* Детальная страница товара */
+.back-link {
+  display: inline-block;
+  margin: 4px 0 12px;
+  color: #2c6cb0;
+  text-decoration: none;
+}
+
+.product-detail {
+  display: flex;
+  gap: 28px;
+  flex-wrap: wrap;
+  align-items: flex-start;
+}
+
+.gallery {
+  flex: 1 1 360px;
+  max-width: 520px;
+}
+
+.gallery-main {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 420px;
+  background: #f0f2f5;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.gallery-main img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.gallery-thumbs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.gallery-thumb {
+  width: 72px;
+  height: 72px;
+  padding: 0;
+  border: 2px solid transparent;
+  border-radius: 8px;
+  overflow: hidden;
+  cursor: pointer;
+  background: #f0f2f5;
+}
+
+.gallery-thumb.is-active {
+  border-color: #4a90d9;
+}
+
+.gallery-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.product-info {
+  flex: 1 1 320px;
+}
+
+.product-info h1 {
+  margin: 0 0 6px;
 }
 
 .price {

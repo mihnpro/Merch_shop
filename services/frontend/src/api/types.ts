@@ -54,7 +54,7 @@ export interface Product {
   price_points: number;
   category: Category;
   sizes: string[];
-  photo_key?: string;
+  photo_keys: string[];
   active: boolean;
   version: number;
   created_at: string;
@@ -84,7 +84,7 @@ export interface ProductInput {
   price_points: number;
   category_id: string;
   sizes: string[];
-  photo_key?: string;
+  photo_keys: string[];
 }
 
 export interface UpdateProductInput extends ProductInput {
@@ -100,4 +100,8 @@ export interface CreateCategoryInput {
 export interface UpdateCategoryInput {
   name: string;
   active: boolean;
+}
+
+export interface UploadPhotoResponse {
+  photo_key: string;
 }

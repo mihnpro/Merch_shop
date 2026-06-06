@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import NavBar from "../components/NavBar";
 import { listCategories, listProducts } from "../api/catalog";
 import type { Category, Product } from "../api/types";
+import { photoUrl } from "../lib/media";
 
 export default function CatalogPage() {
   const [categories, setCategories] = useState<Category[]>([]);
@@ -37,10 +39,8 @@ export default function CatalogPage() {
     }
   }
 
-  // первичная загрузка и реакция на смену фильтра категории
   useEffect(() => {
     load(false);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [categoryId]);
 
   function handleSearch(event: React.FormEvent) {
@@ -78,8 +78,14 @@ export default function CatalogPage() {
 
       <div className="grid">
         {products.map((p) => (
-          <article key={p.id} className="product-card">
-            <div className="product-photo">{p.photo_key ? "🖼" : "нет фото"}</div>
+          <Link key={p.id} to={`/catalog/${p.id}`} className="product-card">
+            <div className="product-photo">
+              {photoUrl(p.photo_keys[0]) ? (
+                <img src={photoUrl(p.photo_keys[0])} alt={p.name} loading="lazy" />
+              ) : (
+                "нет фото"
+              )}
+            </div>
             <h3>{p.name}</h3>
             <p className="muted">{p.category.name}</p>
             <p className="price">{p.price_points} баллов</p>
@@ -93,7 +99,7 @@ export default function CatalogPage() {
               </div>
             )}
             <p className="desc">{p.description}</p>
-          </article>
+          </Link>
         ))}
       </div>
 
