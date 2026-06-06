@@ -38,8 +38,6 @@ CREATE TABLE products (
     price_points  BIGINT       NOT NULL
                                CHECK (price_points > 0),
     category_id   UUID         NOT NULL REFERENCES categories(id) ON DELETE RESTRICT,
-    -- Необязательный набор размеров товара: массив кодов (XS, S, M, ...).
-    -- Отдельного справочника размеров нет — осознанная денормализация.
     sizes         TEXT[]       NOT NULL DEFAULT '{}'
                                CHECK (array_position(sizes, NULL) IS NULL),
     photo_key     TEXT         CHECK (photo_key IS NULL
