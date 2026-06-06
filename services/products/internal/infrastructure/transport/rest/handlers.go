@@ -25,7 +25,7 @@ type productResponse struct {
 	PricePoints int64            `json:"price_points"`
 	Category    categoryResponse `json:"category"`
 	Sizes       []string         `json:"sizes"`
-	PhotoKey    string           `json:"photo_key,omitempty"`
+	PhotoKeys   []string         `json:"photo_keys"`
 	Active      bool             `json:"active"`
 	Version     int              `json:"version"`
 	CreatedAt   time.Time        `json:"created_at"`
@@ -48,7 +48,7 @@ type createProductRequest struct {
 	PricePoints int64    `json:"price_points"`
 	CategoryID  string   `json:"category_id"`
 	Sizes       []string `json:"sizes"`
-	PhotoKey    string   `json:"photo_key"`
+	PhotoKeys   []string `json:"photo_keys"`
 }
 
 type updateProductRequest struct {
@@ -57,7 +57,7 @@ type updateProductRequest struct {
 	PricePoints int64    `json:"price_points"`
 	CategoryID  string   `json:"category_id"`
 	Sizes       []string `json:"sizes"`
-	PhotoKey    string   `json:"photo_key"`
+	PhotoKeys   []string `json:"photo_keys"`
 	Active      bool     `json:"active"`
 	Version     int      `json:"version"`
 }
@@ -128,7 +128,7 @@ func (s *Server) CreateProduct(w http.ResponseWriter, r *http.Request) {
 		PricePoints: req.PricePoints,
 		CategoryID:  req.CategoryID,
 		Sizes:       req.Sizes,
-		PhotoKey:    req.PhotoKey,
+		PhotoKeys:   req.PhotoKeys,
 	})
 	if err != nil {
 		writeError(w, err)
@@ -149,7 +149,7 @@ func (s *Server) UpdateProduct(w http.ResponseWriter, r *http.Request) {
 		PricePoints: req.PricePoints,
 		CategoryID:  req.CategoryID,
 		Sizes:       req.Sizes,
-		PhotoKey:    req.PhotoKey,
+		PhotoKeys:   req.PhotoKeys,
 		Active:      req.Active,
 		Version:     req.Version,
 	})
@@ -216,6 +216,10 @@ func toProductResponse(v dto.ProductView) productResponse {
 	if sizes == nil {
 		sizes = []string{}
 	}
+	photoKeys := v.PhotoKeys
+	if photoKeys == nil {
+		photoKeys = []string{}
+	}
 	return productResponse{
 		ID:          v.ID,
 		Name:        v.Name,
@@ -223,7 +227,7 @@ func toProductResponse(v dto.ProductView) productResponse {
 		PricePoints: v.PricePoints,
 		Category:    toCategoryResponse(v.Category),
 		Sizes:       sizes,
-		PhotoKey:    v.PhotoKey,
+		PhotoKeys:   photoKeys,
 		Active:      v.Active,
 		Version:     v.Version,
 		CreatedAt:   v.CreatedAt,
