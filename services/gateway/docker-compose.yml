@@ -8,6 +8,8 @@ services:
       HTTP_PORT: 8080
       GATEWAY_CONFIG: /etc/gateway/config.yaml
       JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET}
+      HTTP_READ_TIMEOUT: 60s
+      HTTP_WRITE_TIMEOUT: 60s
     volumes:
       - ./config.yaml:/etc/gateway/config.yaml:ro
     ports:
