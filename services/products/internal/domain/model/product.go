@@ -23,21 +23,21 @@ type Product struct {
 	Price       vo.PricePoints
 	Category    Category
 	Sizes       []vo.SizeCode
-	PhotoKey    vo.PhotoKey
+	PhotoKeys   []vo.PhotoKey
 	Active      bool
 	Version     int
 	CreatedAt   time.Time
 	UpdatedAt   time.Time
 }
 
-func NewProduct(name, description string, price vo.PricePoints, category Category, sizes []vo.SizeCode, photoKey vo.PhotoKey) (*Product, error) {
+func NewProduct(name, description string, price vo.PricePoints, category Category, sizes []vo.SizeCode, photoKeys []vo.PhotoKey) (*Product, error) {
 	p := &Product{
 		Name:        strings.TrimSpace(name),
 		Description: strings.TrimSpace(description),
 		Price:       price,
 		Category:    category,
 		Sizes:       sizes,
-		PhotoKey:    photoKey,
+		PhotoKeys:   photoKeys,
 		Active:      true,
 		Version:     1,
 	}
@@ -74,7 +74,7 @@ func (p *Product) Validate() error {
 	return nil
 }
 
-func (p *Product) ApplyUpdate(name, description string, price vo.PricePoints, category Category, sizes []vo.SizeCode, photoKey vo.PhotoKey, active bool, expectedVersion int) error {
+func (p *Product) ApplyUpdate(name, description string, price vo.PricePoints, category Category, sizes []vo.SizeCode, photoKeys []vo.PhotoKey, active bool, expectedVersion int) error {
 	if p.Version != expectedVersion {
 		return domain.ErrVersionConflict
 	}
@@ -83,7 +83,7 @@ func (p *Product) ApplyUpdate(name, description string, price vo.PricePoints, ca
 	p.Price = price
 	p.Category = category
 	p.Sizes = sizes
-	p.PhotoKey = photoKey
+	p.PhotoKeys = photoKeys
 	p.Active = active
 	return p.Validate()
 }
@@ -99,4 +99,12 @@ func (p *Product) SizeCodes() []string {
 		codes = append(codes, s.String())
 	}
 	return codes
+}
+
+func (p *Product) PhotoKeyStrings() []string {
+	keys := make([]string, 0, len(p.PhotoKeys))
+	for _, k := range p.PhotoKeys {
+		keys = append(keys, k.String())
+	}
+	return keys
 }
