@@ -22,7 +22,7 @@ func ToProductView(p *model.Product) ProductView {
 		PricePoints: p.Price.Int64(),
 		Category:    ToCategoryView(&category),
 		Sizes:       p.SizeCodes(),
-		PhotoKey:    p.PhotoKey.String(),
+		PhotoKeys:   p.PhotoKeyStrings(),
 		Active:      p.Active,
 		Version:     p.Version,
 		CreatedAt:   p.CreatedAt,

@@ -47,7 +47,7 @@ func (s *catalogService) CreateProduct(ctx context.Context, in dto.CreateProduct
 		PricePoints: in.PricePoints,
 		CategoryID:  categoryID,
 		Sizes:       in.Sizes,
-		PhotoKey:    in.PhotoKey,
+		PhotoKeys:   in.PhotoKeys,
 	})
 	if err != nil {
 		return dto.ProductView{}, err
@@ -77,7 +77,7 @@ func (s *catalogService) UpdateProduct(ctx context.Context, in dto.UpdateProduct
 		PricePoints: in.PricePoints,
 		CategoryID:  categoryID,
 		Sizes:       in.Sizes,
-		PhotoKey:    in.PhotoKey,
+		PhotoKeys:   in.PhotoKeys,
 		Active:      in.Active,
 		Version:     in.Version,
 	})

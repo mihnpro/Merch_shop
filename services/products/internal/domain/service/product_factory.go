@@ -16,7 +16,7 @@ type CreateProductInput struct {
 	PricePoints int64
 	CategoryID  uuid.UUID
 	Sizes       []string
-	PhotoKey    string
+	PhotoKeys   []string
 }
 
 
@@ -27,7 +27,7 @@ type UpdateProductInput struct {
 	PricePoints int64
 	CategoryID  uuid.UUID
 	Sizes       []string
-	PhotoKey    string
+	PhotoKeys   []string
 	Active      bool
 	Version     int
 }
@@ -46,7 +46,7 @@ func (f *ProductFactory) Create(ctx context.Context, in CreateProductInput) (*mo
 	if err != nil {
 		return nil, err
 	}
-	photo, err := vo.NewPhotoKey(in.PhotoKey)
+	photos, err := buildPhotoKeys(in.PhotoKeys)
 	if err != nil {
 		return nil, err
 	}
@@ -58,7 +58,7 @@ func (f *ProductFactory) Create(ctx context.Context, in CreateProductInput) (*mo
 	if err != nil {
 		return nil, err
 	}
-	return model.NewProduct(in.Name, in.Description, price, *category, sizes, photo)
+	return model.NewProduct(in.Name, in.Description, price, *category, sizes, photos)
 }
 
 
@@ -71,7 +71,7 @@ func (f *ProductFactory) Update(ctx context.Context, in UpdateProductInput) (*mo
 	if err != nil {
 		return nil, err
 	}
-	photo, err := vo.NewPhotoKey(in.PhotoKey)
+	photos, err := buildPhotoKeys(in.PhotoKeys)
 	if err != nil {
 		return nil, err
 	}
@@ -83,7 +83,7 @@ func (f *ProductFactory) Update(ctx context.Context, in UpdateProductInput) (*mo
 	if err != nil {
 		return nil, err
 	}
-	if err := product.ApplyUpdate(in.Name, in.Description, price, *category, sizes, photo, in.Active, in.Version); err != nil {
+	if err := product.ApplyUpdate(in.Name, in.Description, price, *category, sizes, photos, in.Active, in.Version); err != nil {
 		return nil, err
 	}
 	return product, nil
@@ -103,4 +103,22 @@ func buildSizes(raw []string) ([]vo.SizeCode, error) {
 		sizes = append(sizes, code)
 	}
 	return sizes, nil
+}
+
+func buildPhotoKeys(raw []string) ([]vo.PhotoKey, error) {
+	if len(raw) == 0 {
+		return nil, nil
+	}
+	keys := make([]vo.PhotoKey, 0, len(raw))
+	for _, r := range raw {
+		key, err := vo.NewPhotoKey(r)
+		if err != nil {
+			return nil, err
+		}
+		if key.IsEmpty() {
+			continue
+		}
+		keys = append(keys, key)
+	}
+	return keys, nil
 }

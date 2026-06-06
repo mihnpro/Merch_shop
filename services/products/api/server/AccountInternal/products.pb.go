@@ -32,7 +32,7 @@ type Product struct {
 	PricePoints   int64                  `protobuf:"varint,4,opt,name=price_points,json=pricePoints,proto3" json:"price_points,omitempty"`
 	Category      *Category              `protobuf:"bytes,5,opt,name=category,proto3" json:"category,omitempty"`
 	Sizes         []string               `protobuf:"bytes,6,rep,name=sizes,proto3" json:"sizes,omitempty"`
-	PhotoKey      string                 `protobuf:"bytes,7,opt,name=photo_key,json=photoKey,proto3" json:"photo_key,omitempty"`
+	PhotoKeys     []string               `protobuf:"bytes,7,rep,name=photo_keys,json=photoKeys,proto3" json:"photo_keys,omitempty"`
 	Active        bool                   `protobuf:"varint,8,opt,name=active,proto3" json:"active,omitempty"`
 	Version       int32                  `protobuf:"varint,9,opt,name=version,proto3" json:"version,omitempty"`
 	CreatedAt     *timestamppb.Timestamp `protobuf:"bytes,10,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
@@ -113,11 +113,11 @@ func (x *Product) GetSizes() []string {
 	return nil
 }
 
-func (x *Product) GetPhotoKey() string {
+func (x *Product) GetPhotoKeys() []string {
 	if x != nil {
-		return x.PhotoKey
+		return x.PhotoKeys
 	}
-	return ""
+	return nil
 }
 
 func (x *Product) GetActive() bool {
@@ -416,7 +416,7 @@ type CreateProductRequest struct {
 	PricePoints   int64                  `protobuf:"varint,3,opt,name=price_points,json=pricePoints,proto3" json:"price_points,omitempty"`
 	CategoryId    string                 `protobuf:"bytes,4,opt,name=category_id,json=categoryId,proto3" json:"category_id,omitempty"`
 	Sizes         []string               `protobuf:"bytes,5,rep,name=sizes,proto3" json:"sizes,omitempty"`
-	PhotoKey      string                 `protobuf:"bytes,6,opt,name=photo_key,json=photoKey,proto3" json:"photo_key,omitempty"`
+	PhotoKeys     []string               `protobuf:"bytes,6,rep,name=photo_keys,json=photoKeys,proto3" json:"photo_keys,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -486,11 +486,11 @@ func (x *CreateProductRequest) GetSizes() []string {
 	return nil
 }
 
-func (x *CreateProductRequest) GetPhotoKey() string {
+func (x *CreateProductRequest) GetPhotoKeys() []string {
 	if x != nil {
-		return x.PhotoKey
+		return x.PhotoKeys
 	}
-	return ""
+	return nil
 }
 
 // Обновление товара админом. Идёт с version для оптимистической блокировки
@@ -502,7 +502,7 @@ type UpdateProductRequest struct {
 	PricePoints   int64                  `protobuf:"varint,4,opt,name=price_points,json=pricePoints,proto3" json:"price_points,omitempty"`
 	CategoryId    string                 `protobuf:"bytes,5,opt,name=category_id,json=categoryId,proto3" json:"category_id,omitempty"`
 	Sizes         []string               `protobuf:"bytes,6,rep,name=sizes,proto3" json:"sizes,omitempty"`
-	PhotoKey      string                 `protobuf:"bytes,7,opt,name=photo_key,json=photoKey,proto3" json:"photo_key,omitempty"`
+	PhotoKeys     []string               `protobuf:"bytes,7,rep,name=photo_keys,json=photoKeys,proto3" json:"photo_keys,omitempty"`
 	Version       int32                  `protobuf:"varint,8,opt,name=version,proto3" json:"version,omitempty"`
 	Active        bool                   `protobuf:"varint,9,opt,name=active,proto3" json:"active,omitempty"` // статус товара (true — активен, false — скрыт)
 	unknownFields protoimpl.UnknownFields
@@ -581,11 +581,11 @@ func (x *UpdateProductRequest) GetSizes() []string {
 	return nil
 }
 
-func (x *UpdateProductRequest) GetPhotoKey() string {
+func (x *UpdateProductRequest) GetPhotoKeys() []string {
 	if x != nil {
-		return x.PhotoKey
+		return x.PhotoKeys
 	}
-	return ""
+	return nil
 }
 
 func (x *UpdateProductRequest) GetVersion() int32 {
@@ -855,15 +855,16 @@ var File_products_proto protoreflect.FileDescriptor
 
 const file_products_proto_rawDesc = "" +
 	"\n" +
-	"\x0eproducts.proto\x12\bproducts\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1bgoogle/protobuf/empty.proto\"\xfd\x02\n" +
+	"\x0eproducts.proto\x12\bproducts\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1bgoogle/protobuf/empty.proto\"\xff\x02\n" +
 	"\aProduct\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12 \n" +
 	"\vdescription\x18\x03 \x01(\tR\vdescription\x12!\n" +
 	"\fprice_points\x18\x04 \x01(\x03R\vpricePoints\x12.\n" +
 	"\bcategory\x18\x05 \x01(\v2\x12.products.CategoryR\bcategory\x12\x14\n" +
-	"\x05sizes\x18\x06 \x03(\tR\x05sizes\x12\x1b\n" +
-	"\tphoto_key\x18\a \x01(\tR\bphotoKey\x12\x16\n" +
+	"\x05sizes\x18\x06 \x03(\tR\x05sizes\x12\x1d\n" +
+	"\n" +
+	"photo_keys\x18\a \x03(\tR\tphotoKeys\x12\x16\n" +
 	"\x06active\x18\b \x01(\bR\x06active\x12\x18\n" +
 	"\aversion\x18\t \x01(\x05R\aversion\x129\n" +
 	"\n" +
@@ -894,15 +895,16 @@ const file_products_proto_rawDesc = "" +
 	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken\"2\n" +
 	"\x11GetProductRequest\x12\x1d\n" +
 	"\n" +
-	"product_id\x18\x01 \x01(\tR\tproductId\"\xc3\x01\n" +
+	"product_id\x18\x01 \x01(\tR\tproductId\"\xc5\x01\n" +
 	"\x14CreateProductRequest\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12 \n" +
 	"\vdescription\x18\x02 \x01(\tR\vdescription\x12!\n" +
 	"\fprice_points\x18\x03 \x01(\x03R\vpricePoints\x12\x1f\n" +
 	"\vcategory_id\x18\x04 \x01(\tR\n" +
 	"categoryId\x12\x14\n" +
-	"\x05sizes\x18\x05 \x03(\tR\x05sizes\x12\x1b\n" +
-	"\tphoto_key\x18\x06 \x01(\tR\bphotoKey\"\x94\x02\n" +
+	"\x05sizes\x18\x05 \x03(\tR\x05sizes\x12\x1d\n" +
+	"\n" +
+	"photo_keys\x18\x06 \x03(\tR\tphotoKeys\"\x96\x02\n" +
 	"\x14UpdateProductRequest\x12\x1d\n" +
 	"\n" +
 	"product_id\x18\x01 \x01(\tR\tproductId\x12\x12\n" +
@@ -911,8 +913,9 @@ const file_products_proto_rawDesc = "" +
 	"\fprice_points\x18\x04 \x01(\x03R\vpricePoints\x12\x1f\n" +
 	"\vcategory_id\x18\x05 \x01(\tR\n" +
 	"categoryId\x12\x14\n" +
-	"\x05sizes\x18\x06 \x03(\tR\x05sizes\x12\x1b\n" +
-	"\tphoto_key\x18\a \x01(\tR\bphotoKey\x12\x18\n" +
+	"\x05sizes\x18\x06 \x03(\tR\x05sizes\x12\x1d\n" +
+	"\n" +
+	"photo_keys\x18\a \x03(\tR\tphotoKeys\x12\x18\n" +
 	"\aversion\x18\b \x01(\x05R\aversion\x12\x16\n" +
 	"\x06active\x18\t \x01(\bR\x06active\"9\n" +
 	"\x18DeactivateProductRequest\x12\x1d\n" +
