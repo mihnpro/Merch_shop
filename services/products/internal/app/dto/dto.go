@@ -8,7 +8,7 @@ type CreateProductInput struct {
 	PricePoints int64
 	CategoryID  string
 	Sizes       []string
-	PhotoKey    string
+	PhotoKeys   []string
 }
 
 type UpdateProductInput struct {
@@ -18,7 +18,7 @@ type UpdateProductInput struct {
 	PricePoints int64
 	CategoryID  string
 	Sizes       []string
-	PhotoKey    string
+	PhotoKeys   []string
 	Active      bool
 	Version     int
 }
@@ -59,7 +59,7 @@ type ProductView struct {
 	PricePoints int64
 	Category    CategoryView
 	Sizes       []string
-	PhotoKey    string
+	PhotoKeys   []string
 	Active      bool
 	Version     int
 	CreatedAt   time.Time
