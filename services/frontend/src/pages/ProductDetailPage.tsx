@@ -1,0 +1,81 @@
+import { useEffect, useState } from "react";
+import { Link, useParams } from "react-router-dom";
+import NavBar from "../components/NavBar";
+import { getProduct } from "../api/catalog";
+import type { Product } from "../api/types";
+import { photoUrl } from "../lib/media";
+
+export default function ProductDetailPage() {
+  const { id } = useParams<{ id: string }>();
+  const [product, setProduct] = useState<Product | null>(null);
+  const [active, setActive] = useState(0);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (!id) return;
+    getProduct(id)
+      .then((p) => {
+        setProduct(p);
+        setActive(0);
+      })
+      .catch((err) => setError(err instanceof Error ? err.message : "Ошибка"));
+  }, [id]);
+
+  return (
+    <div className="page">
+      <NavBar />
+      <Link to="/catalog" className="back-link">
+        ← Назад в каталог
+      </Link>
+
+      {error && <p className="error">{error}</p>}
+
+      {!product && !error && <p>Загрузка…</p>}
+
+      {product && (
+        <div className="product-detail">
+          <div className="gallery">
+            <div className="gallery-main">
+              {photoUrl(product.photo_keys[active]) ? (
+                <img src={photoUrl(product.photo_keys[active])} alt={product.name} />
+              ) : (
+                <span className="muted">нет фото</span>
+              )}
+            </div>
+            {product.photo_keys.length > 1 && (
+              <div className="gallery-thumbs">
+                {product.photo_keys.map((key, i) => (
+                  <button
+                    key={key}
+                    type="button"
+                    className={`gallery-thumb${i === active ? " is-active" : ""}`}
+                    onClick={() => setActive(i)}
+                  >
+                    <img src={photoUrl(key)} alt={`Фото ${i + 1}`} loading="lazy" />
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="product-info">
+            <h1>{product.name}</h1>
+            <p className="muted">{product.category.name}</p>
+            <p className="price">{product.price_points} баллов</p>
+            {product.sizes.length > 0 && (
+              <div className="chips">
+                {product.sizes.map((s) => (
+                  <span key={s} className="chip">
+                    {s}
+                  </span>
+                ))}
+              </div>
+            )}
+            <p className="desc">{product.description}</p>
+            {!product.active && <p className="muted">Товар скрыт из каталога</p>}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
