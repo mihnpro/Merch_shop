@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { listCategories, listProducts } from "../../api/catalog";
 import { createProduct, deactivateProduct, updateProduct } from "../../api/admin";
 import type { Category, Product } from "../../api/types";
+import PhotoGalleryUpload from "../../components/PhotoGalleryUpload";
 
 function parseSizes(raw: string): string[] {
   return raw
@@ -22,7 +23,7 @@ export default function ProductsPanel() {
   const [price, setPrice] = useState("");
   const [categoryId, setCategoryId] = useState("");
   const [sizes, setSizes] = useState("");
-  const [photoKey, setPhotoKey] = useState("");
+  const [photoKeys, setPhotoKeys] = useState<string[]>([]);
 
   async function reload() {
     setError("");
@@ -52,13 +53,13 @@ export default function ProductsPanel() {
         price_points: Number(price),
         category_id: categoryId,
         sizes: parseSizes(sizes),
-        photo_key: photoKey.trim() || undefined,
+        photo_keys: photoKeys,
       });
       setName("");
       setDescription("");
       setPrice("");
       setSizes("");
-      setPhotoKey("");
+      setPhotoKeys([]);
       setInfo("Товар создан");
       await reload();
     } catch (err) {
@@ -77,7 +78,7 @@ export default function ProductsPanel() {
     }
   }
 
-  // Возврат товара в активный статус: PUT со всеми текущими полями + active=true.
+
   async function handleActivate(p: Product) {
     setError("");
     setInfo("");
@@ -88,7 +89,7 @@ export default function ProductsPanel() {
         price_points: p.price_points,
         category_id: p.category.id,
         sizes: p.sizes,
-        photo_key: p.photo_key || undefined,
+        photo_keys: p.photo_keys,
         active: true,
         version: p.version,
       });
@@ -133,10 +134,7 @@ export default function ProductsPanel() {
             <input value={sizes} onChange={(e) => setSizes(e.target.value)} placeholder="XS, S, M, L" />
           </label>
         </div>
-        <label>
-          photo_key (необязательно)
-          <input value={photoKey} onChange={(e) => setPhotoKey(e.target.value)} placeholder="products/<uuid>.jpg" />
-        </label>
+        <PhotoGalleryUpload value={photoKeys} onChange={setPhotoKeys} />
         <button type="submit">Создать товар</button>
       </form>
 
@@ -195,6 +193,7 @@ function ProductRow({
   const [price, setPrice] = useState(String(product.price_points));
   const [categoryId, setCategoryId] = useState(product.category.id);
   const [sizes, setSizes] = useState(product.sizes.join(", "));
+  const [photoKeys, setPhotoKeys] = useState<string[]>(product.photo_keys);
 
   async function save() {
     onError("");
@@ -205,7 +204,7 @@ function ProductRow({
         price_points: Number(price),
         category_id: categoryId,
         sizes: parseSizes(sizes),
-        photo_key: product.photo_key || undefined,
+        photo_keys: photoKeys,
         active: product.active,
         version: product.version,
       });
@@ -213,7 +212,7 @@ function ProductRow({
       onChanged();
     } catch (err) {
       onError(err instanceof Error ? err.message : "Ошибка");
-      onChanged(); // подтянуть актуальную версию при конфликте
+      onChanged(); 
     }
   }
 
@@ -248,6 +247,7 @@ function ProductRow({
       <td>
         <input value={name} onChange={(e) => setName(e.target.value)} />
         <input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="описание" />
+        <PhotoGalleryUpload value={photoKeys} onChange={setPhotoKeys} />
       </td>
       <td>
         <select value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>
