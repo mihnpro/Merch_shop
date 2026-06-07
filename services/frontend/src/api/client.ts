@@ -1,6 +1,5 @@
-import { getAccessToken } from "../lib/tokens";
 
-const API_BASE = import.meta.env.VITE_API_URL ?? "http://localhost:8080";
+const API_BASE = import.meta.env.VITE_API_URL ?? "";
 const BASE_URL = `${API_BASE}/api/v1`;
 
 export async function request<T>(
@@ -10,12 +9,11 @@ export async function request<T>(
   const headers = new Headers(options.headers);
   headers.set("Content-Type", "application/json");
 
-  const token = getAccessToken();
-  if (token) {
-    headers.set("Authorization", `Bearer ${token}`);
-  }
-
-  const response = await fetch(`${BASE_URL}${path}`, { ...options, headers });
+  const response = await fetch(`${BASE_URL}${path}`, {
+    ...options,
+    headers,
+    credentials: "include",
+  });
 
   return parseResponse<T>(response);
 }
@@ -28,16 +26,10 @@ export async function uploadFile<T>(
   const form = new FormData();
   form.append(field, file);
 
-  const headers = new Headers();
-  const token = getAccessToken();
-  if (token) {
-    headers.set("Authorization", `Bearer ${token}`);
-  }
-
   const response = await fetch(`${BASE_URL}${path}`, {
     method: "POST",
     body: form,
-    headers,
+    credentials: "include",
   });
 
   return parseResponse<T>(response);

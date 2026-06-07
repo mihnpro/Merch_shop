@@ -8,11 +8,6 @@ export interface User {
   phone_number?: string;
 }
 
-export interface Tokens {
-  access_token: string;
-  refresh_token: string;
-}
-
 export interface RegisterBody {
   login: string;
   password: string;
@@ -30,7 +25,6 @@ export interface LoginBody {
 
 export interface LoginResponse {
   user: User;
-  tokens: Tokens;
 }
 
 export interface MeResponse {
