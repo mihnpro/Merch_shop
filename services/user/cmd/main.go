@@ -93,11 +93,19 @@ func main() {
 	userpb.RegisterUserServiceServer(s, grpcSrv)
 	reflection.Register(s)
 
+	cookieCfg := resttransport.CookieConfig{
+		Secure:     boolEnv("COOKIE_SECURE", false),
+		SameSite:   resttransport.ParseSameSite(getEnv("COOKIE_SAMESITE", "lax")),
+		Domain:     os.Getenv("COOKIE_DOMAIN"),
+		AccessTTL:  accessTokenTTL,
+		RefreshTTL: refreshTokenTTL,
+	}
+
 	httpPort := getEnv("HTTP_PORT", "8081")
 	httpSrv := &http.Server{
 		Addr:    fmt.Sprintf(":%s", httpPort),
 		Handler: resttransport.NewRouter(
-			resttransport.NewServer(querySvc, logger),
+			resttransport.NewServer(querySvc, logger, cookieCfg),
 			resttransport.NewMiddleware(acct),
 		),
 	}
@@ -134,6 +142,18 @@ func getEnv(key, fallback string) string {
 		return v
 	}
 	return fallback
+}
+
+func boolEnv(key string, fallback bool) bool {
+	v, ok := os.LookupEnv(key)
+	if !ok || v == "" {
+		return fallback
+	}
+	b, err := strconv.ParseBool(v)
+	if err != nil {
+		return fallback
+	}
+	return b
 }
 
 func atoiOr(s string, fallback int) int {
