@@ -1,0 +1,25 @@
+syntax = "proto3";
+
+package media;
+
+option go_package = "github.com/mihnpro/Merch_shop/services/media/api/server/AccountInternal;mediapb";
+
+service MediaService {
+    rpc UploadPhoto(stream UploadPhotoRequest) returns (PhotoKey);
+}
+
+message UploadPhotoRequest {
+    oneof payload {
+        UploadMetadata metadata = 1;
+        bytes          data     = 2;
+    }
+}
+
+message UploadMetadata {
+    string filename     = 1;
+    string content_type = 2;
+}
+
+message PhotoKey {
+    string photo_key = 1;
+}

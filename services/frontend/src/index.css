@@ -122,3 +122,503 @@ button:disabled {
   color: #888;
   margin-right: 6px;
 }
+
+/* --- Внутренние страницы (каталог, админка) --- */
+
+.page {
+  align-self: flex-start;
+  width: 100%;
+  max-width: none;
+  margin: 24px auto;
+  padding: 0 24px;
+}
+
+.page h1 {
+  font-size: 24px;
+  margin: 8px 0 16px;
+}
+
+.nav {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 12px 16px;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  margin-bottom: 8px;
+}
+
+.nav-brand {
+  font-weight: 700;
+  color: #4f7cff;
+}
+
+.nav-links {
+  display: flex;
+  gap: 16px;
+  flex: 1;
+}
+
+.nav-links a {
+  color: #444;
+  text-decoration: none;
+  font-size: 15px;
+}
+
+.nav-links a.active {
+  color: #4f7cff;
+  font-weight: 600;
+}
+
+.nav-logout {
+  width: auto;
+  margin: 0;
+  padding: 8px 14px;
+}
+
+/* Вторичная кнопка */
+.btn-secondary {
+  width: auto;
+  margin: 0;
+  padding: 8px 14px;
+  font-weight: 500;
+  color: #4f7cff;
+  background: #eef2ff;
+}
+
+.btn-secondary:hover {
+  background: #e0e7ff;
+}
+
+/* Тулбар фильтров */
+.toolbar {
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.toolbar input,
+.toolbar select {
+  flex: 1;
+}
+
+.toolbar button {
+  width: auto;
+  margin: 0;
+}
+
+select {
+  padding: 10px 12px;
+  font-size: 15px;
+  border: 1px solid #d0d3d9;
+  border-radius: 8px;
+  background: #fff;
+}
+
+/* Сетка каталога */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 16px;
+}
+
+.product-card {
+  display: block;
+  background: #fff;
+  border-radius: 12px;
+  padding: 16px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
+  color: inherit;
+  text-decoration: none;
+  cursor: pointer;
+  transition: box-shadow 0.15s, transform 0.15s;
+}
+
+a.product-card:hover {
+  box-shadow: 0 6px 26px rgba(0, 0, 0, 0.12);
+  transform: translateY(-2px);
+}
+
+.product-card h3 {
+  margin: 10px 0 4px;
+  font-size: 16px;
+}
+
+.product-photo {
+  height: 120px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f0f2f5;
+  border-radius: 8px;
+  color: #9aa0a6;
+  font-size: 14px;
+  overflow: hidden;
+}
+
+.product-photo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.photo-upload {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.photo-upload-label {
+  font-size: 13px;
+  color: #444;
+}
+
+.photo-dropzone {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  min-height: 96px;
+  padding: 16px;
+  border: 2px dashed #c4c9d4;
+  border-radius: 8px;
+  background: #fafbfc;
+  color: #6b7280;
+  font-size: 14px;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.photo-dropzone:hover {
+  border-color: #4a90d9;
+}
+
+.photo-dropzone.is-dragover {
+  border-color: #4a90d9;
+  background: #eef5fc;
+  color: #2c6cb0;
+}
+
+.photo-thumbs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.photo-thumb {
+  position: relative;
+  width: 88px;
+  height: 88px;
+}
+
+.photo-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid #e2e5ea;
+}
+
+.photo-thumb-badge {
+  position: absolute;
+  left: 4px;
+  bottom: 4px;
+  padding: 1px 6px;
+  font-size: 11px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+}
+
+.photo-thumb-remove {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border-radius: 50%;
+  border: none;
+  background: #d14343;
+  color: #fff;
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+/* Детальная страница товара */
+.back-link {
+  display: inline-block;
+  margin: 4px 0 12px;
+  color: #2c6cb0;
+  text-decoration: none;
+}
+
+.product-detail {
+  display: flex;
+  gap: 28px;
+  flex-wrap: wrap;
+  align-items: flex-start;
+}
+
+.gallery {
+  flex: 1 1 360px;
+  max-width: 520px;
+}
+
+.gallery-main {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 420px;
+  background: #f0f2f5;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.gallery-main img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.gallery-thumbs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.gallery-thumb {
+  width: 72px;
+  height: 72px;
+  padding: 0;
+  border: 2px solid transparent;
+  border-radius: 8px;
+  overflow: hidden;
+  cursor: pointer;
+  background: #f0f2f5;
+}
+
+.gallery-thumb.is-active {
+  border-color: #4a90d9;
+}
+
+.gallery-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.product-info {
+  flex: 1 1 320px;
+}
+
+.product-info h1 {
+  margin: 0 0 6px;
+}
+
+.price {
+  font-weight: 700;
+  color: #1a1a1a;
+  margin: 6px 0;
+}
+
+.muted {
+  color: #888;
+  font-size: 13px;
+  margin: 0;
+}
+
+.desc {
+  color: #555;
+  font-size: 14px;
+  margin: 8px 0 0;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 6px 0;
+}
+
+.chip {
+  font-size: 12px;
+  padding: 2px 8px;
+  background: #eef2ff;
+  color: #4f7cff;
+  border-radius: 999px;
+}
+
+.load-more {
+  margin: 20px auto 0;
+  display: block;
+}
+
+/* Вкладки админки */
+.tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.tab {
+  width: auto;
+  margin: 0;
+  background: #fff;
+  color: #444;
+  border: 1px solid #d0d3d9;
+}
+
+.tab:hover {
+  background: #f4f5f7;
+}
+
+.tab.active {
+  background: #4f7cff;
+  color: #fff;
+  border-color: #4f7cff;
+}
+
+/* Формы панелей */
+.panel-form {
+  background: #fff;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
+  margin-bottom: 20px;
+}
+
+.panel-form h3 {
+  margin: 0 0 14px;
+  font-size: 17px;
+}
+
+.panel-form .row {
+  flex-direction: row;
+  gap: 14px;
+}
+
+.panel-form .row label {
+  flex: 1;
+}
+
+.panel-form button {
+  width: auto;
+  align-self: flex-start;
+}
+
+/* Таблицы админки */
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  background: #fff;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
+}
+
+.table th,
+.table td {
+  text-align: left;
+  padding: 10px 12px;
+  border-bottom: 1px solid #eef0f3;
+  font-size: 14px;
+  vertical-align: top;
+}
+
+.table th {
+  background: #f7f8fa;
+  color: #666;
+  font-weight: 600;
+}
+
+.table td input,
+.table td select {
+  width: 100%;
+  margin-bottom: 4px;
+}
+
+.actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.actions button {
+  width: auto;
+  margin: 0;
+}
+
+/* Горизонтальный скролл широких таблиц на узких экранах */
+.table-wrap {
+  width: 100%;
+  overflow-x: auto;
+}
+
+/* --- Адаптив --- */
+
+@media (max-width: 720px) {
+  .page {
+    margin: 12px auto;
+    padding: 0 12px;
+  }
+
+  .page h1 {
+    font-size: 20px;
+  }
+
+  /* Навбар переносит элементы на узких экранах */
+  .nav {
+    flex-wrap: wrap;
+    gap: 10px 14px;
+  }
+
+  .nav-links {
+    order: 3;
+    flex-basis: 100%;
+    flex-wrap: wrap;
+  }
+
+  .nav-logout {
+    margin-left: auto;
+  }
+
+  /* Фильтры каталога — в столбик */
+  .toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .toolbar input,
+  .toolbar select,
+  .toolbar button {
+    width: 100%;
+  }
+
+  /* Парные поля форм — в столбик */
+  .panel-form .row {
+    flex-direction: column;
+    gap: 0;
+  }
+
+  /* Таблицы админки скроллятся по горизонтали, не ломая раскладку */
+  .table {
+    min-width: 560px;
+  }
+}
+
+@media (max-width: 420px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
+
+  .card {
+    padding: 20px;
+    border-radius: 10px;
+  }
+}

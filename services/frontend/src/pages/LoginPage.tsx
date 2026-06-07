@@ -21,7 +21,7 @@ export default function LoginPage() {
     try {
       const data = await login({ login: loginValue, password });
       saveTokens(data.tokens.access_token, data.tokens.refresh_token);
-      navigate("/profile");
+      navigate("/catalog");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Не удалось войти");
     } finally {

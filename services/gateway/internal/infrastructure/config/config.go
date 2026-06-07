@@ -94,8 +94,9 @@ func loadRoutes(path string) ([]Route, error) {
 		if !ok {
 			return nil, fmt.Errorf("gateway config: route %q references unknown service %q", r.Prefix, r.Service)
 		}
+		prefix := strings.TrimSuffix(r.Prefix, "*")
 
-		routes = append(routes, Route{Prefix: r.Prefix, Target: target, Public: r.Public})
+		routes = append(routes, Route{Prefix: prefix, Target: target, Public: r.Public})
 	}
 	return routes, nil
 }

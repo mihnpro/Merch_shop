@@ -1,0 +1,347 @@
+openapi: 3.0.3
+info:
+  title: Product Service — Public API
+  description: >-
+    Публичные HTTP-эндпоинты product-сервиса, доступные клиентам через gateway.
+    Чтение каталога доступно любому аутентифицированному сотруднику; методы
+    записи (раздел /admin) требуют роль admin. Приватные межсервисные методы
+    описаны gRPC-контрактом в ../AccountInternal/products.proto.
+  version: 1.0.0
+
+servers:
+  - url: /api/v1
+    description: Базовый префикс (gateway проксирует по нему в product-сервис)
+
+tags:
+  - name: catalog
+    description: Чтение каталога товаров и категорий (любой сотрудник)
+  - name: admin
+    description: Управление каталогом (только role=admin)
+
+paths:
+  /products:
+    get:
+      tags: [catalog]
+      summary: Список товаров с фильтрами и пагинацией по токену
+      parameters:
+        - { name: category_id, in: query, schema: { type: string, format: uuid }, description: Фильтр по категории }
+        - { name: search, in: query, schema: { type: string }, description: Поиск по названию }
+        - { name: active_only, in: query, schema: { type: boolean, default: true }, description: Только активные товары }
+        - { name: page_size, in: query, schema: { type: integer, default: 24, minimum: 1, maximum: 100 } }
+        - { name: page_token, in: query, schema: { type: string }, description: Токен следующей страницы }
+      responses:
+        "200":
+          description: Страница каталога
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListProductsResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /products/{product_id}:
+    get:
+      tags: [catalog]
+      summary: Карточка товара по идентификатору
+      parameters:
+        - $ref: "#/components/parameters/ProductId"
+      responses:
+        "200":
+          description: Товар
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Product"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /categories:
+    get:
+      tags: [catalog]
+      summary: Справочник категорий
+      parameters:
+        - { name: active_only, in: query, schema: { type: boolean, default: true }, description: Только активные категории }
+      responses:
+        "200":
+          description: Список категорий
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  categories:
+                    type: array
+                    items: { $ref: "#/components/schemas/Category" }
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /admin/products:
+    post:
+      tags: [admin]
+      summary: Создать товар
+      description: photo_key получают заранее из Media Service (UploadPhoto).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateProductRequest"
+      responses:
+        "201":
+          description: Товар создан
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Product"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          description: Категория не найдена
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /admin/products/{product_id}:
+    put:
+      tags: [admin]
+      summary: Обновить товар (оптимистическая блокировка по version)
+      parameters:
+        - $ref: "#/components/parameters/ProductId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateProductRequest"
+      responses:
+        "200":
+          description: Товар обновлён
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Product"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/VersionConflict"
+    delete:
+      tags: [admin]
+      summary: Деактивировать товар (soft-delete)
+      parameters:
+        - $ref: "#/components/parameters/ProductId"
+      responses:
+        "204":
+          description: Товар деактивирован
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /admin/categories:
+    post:
+      tags: [admin]
+      summary: Создать категорию
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCategoryRequest"
+      responses:
+        "201":
+          description: Категория создана
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Category"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          description: Категория с таким кодом уже существует
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /admin/categories/{category_id}:
+    put:
+      tags: [admin]
+      summary: Обновить категорию (переименование / активация-деактивация)
+      parameters:
+        - { name: category_id, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateCategoryRequest"
+      responses:
+        "200":
+          description: Категория обновлена
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Category"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    ProductId:
+      name: product_id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+
+  responses:
+    BadRequest:
+      description: Некорректный запрос / ошибка валидации
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    Unauthorized:
+      description: Отсутствует или невалиден токен
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    Forbidden:
+      description: Недостаточно прав (требуется role=admin)
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    NotFound:
+      description: Ресурс не найден
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    VersionConflict:
+      description: Товар изменён другим запросом (конфликт version)
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+
+  schemas:
+    Category:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        code: { type: string }
+        name: { type: string }
+        active: { type: boolean }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    Product:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        description: { type: string }
+        price_points: { type: integer, format: int64 }
+        category:
+          $ref: "#/components/schemas/Category"
+        sizes:
+          type: array
+          items: { type: string }
+          description: Необязательный набор кодов размеров (XS, S, M, …)
+        photo_key:
+          type: string
+          description: Ключ фото в MinIO ("products/{uuid}.{ext}"); пусто, если фото нет
+        active: { type: boolean }
+        version: { type: integer, format: int32 }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    ListProductsResponse:
+      type: object
+      properties:
+        products:
+          type: array
+          items: { $ref: "#/components/schemas/Product" }
+        next_page_token:
+          type: string
+          description: Токен следующей страницы; пусто, если страница последняя
+
+    CreateProductRequest:
+      type: object
+      required: [name, description, price_points, category_id]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 500 }
+        description: { type: string, minLength: 1, maxLength: 5000 }
+        price_points: { type: integer, format: int64, minimum: 1 }
+        category_id: { type: string, format: uuid }
+        sizes:
+          type: array
+          items: { type: string }
+        photo_key: { type: string }
+
+    UpdateProductRequest:
+      type: object
+      required: [name, description, price_points, category_id, version]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 500 }
+        description: { type: string, minLength: 1, maxLength: 5000 }
+        price_points: { type: integer, format: int64, minimum: 1 }
+        category_id: { type: string, format: uuid }
+        sizes:
+          type: array
+          items: { type: string }
+        photo_key: { type: string }
+        version:
+          type: integer
+          format: int32
+          description: Текущая версия товара для оптимистической блокировки
+
+    CreateCategoryRequest:
+      type: object
+      required: [code, name]
+      properties:
+        code: { type: string, pattern: "^[a-z_]{1,30}$" }
+        name: { type: string, minLength: 1, maxLength: 100 }
+
+    UpdateCategoryRequest:
+      type: object
+      required: [name, active]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 100 }
+        active: { type: boolean }
+
+    Error:
+      type: object
+      properties:
+        code: { type: string }
+        message: { type: string }
+
+security:
+  - bearerAuth: []
