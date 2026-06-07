@@ -33,22 +33,8 @@ type loginRequest struct {
 	Password string `json:"password"`
 }
 
-type tokensResponse struct {
-	AccessToken  string `json:"access_token"`
-	RefreshToken string `json:"refresh_token"`
-}
-
 type loginResponse struct {
-	User   userResponse   `json:"user"`
-	Tokens tokensResponse `json:"tokens"`
-}
-
-type refreshRequest struct {
-	RefreshToken string `json:"refresh_token"`
-}
-
-type logoutRequest struct {
-	RefreshToken string `json:"refresh_token"`
+	User userResponse `json:"user"`
 }
 
 func (s *Server) Register(w http.ResponseWriter, r *http.Request) {
@@ -88,46 +74,36 @@ func (s *Server) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusOK, loginResponse{
-		User: toUserResponse(res.User),
-		Tokens: tokensResponse{
-			AccessToken:  res.Tokens.AccessToken,
-			RefreshToken: res.Tokens.RefreshToken,
-		},
-	})
+	s.setAuthCookies(w, res.Tokens.AccessToken, res.Tokens.RefreshToken)
+	writeJSON(w, http.StatusOK, loginResponse{User: toUserResponse(res.User)})
 }
 
 func (s *Server) Refresh(w http.ResponseWriter, r *http.Request) {
-	var req refreshRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeJSON(w, http.StatusBadRequest, apiError{Code: "INVALID_JSON", Message: "invalid request body"})
+	refreshToken := readRefreshCookie(r)
+	if refreshToken == "" {
+		writeError(w, domain.ErrInvalidToken)
 		return
 	}
 
-	tokens, err := s.auth.Refresh(r.Context(), req.RefreshToken)
+	tokens, err := s.auth.Refresh(r.Context(), refreshToken)
 	if err != nil {
 		writeError(w, err)
 		return
 	}
 
-	writeJSON(w, http.StatusOK, tokensResponse{
-		AccessToken:  tokens.AccessToken,
-		RefreshToken: tokens.RefreshToken,
-	})
+	s.setAuthCookies(w, tokens.AccessToken, tokens.RefreshToken)
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (s *Server) Logout(w http.ResponseWriter, r *http.Request) {
-	var req logoutRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeJSON(w, http.StatusBadRequest, apiError{Code: "INVALID_JSON", Message: "invalid request body"})
-		return
+	if refreshToken := readRefreshCookie(r); refreshToken != "" {
+		if err := s.auth.Logout(r.Context(), refreshToken); err != nil {
+			writeError(w, err)
+			return
+		}
 	}
 
-	if err := s.auth.Logout(r.Context(), req.RefreshToken); err != nil {
-		writeError(w, err)
-		return
-	}
-
+	s.clearAuthCookies(w)
 	w.WriteHeader(http.StatusNoContent)
 }
 
