@@ -1,19 +1,17 @@
 import { NavLink, useNavigate } from "react-router-dom";
 import { logout } from "../api/auth";
-import { clearTokens, getRefreshToken } from "../lib/tokens";
-import { isAdmin } from "../lib/auth";
+import { useAuth } from "../lib/AuthContext";
 
 export default function NavBar() {
   const navigate = useNavigate();
-  const admin = isAdmin();
+  const { isAdmin: admin, setAnonymous } = useAuth();
 
   async function handleLogout() {
-    const refreshToken = getRefreshToken();
     try {
-      if (refreshToken) await logout(refreshToken);
+      await logout();
     } catch {
     } finally {
-      clearTokens();
+      setAnonymous();
       navigate("/login");
     }
   }
