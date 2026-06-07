@@ -9,11 +9,10 @@ import (
 const (
 	accessCookieName  = "access_token"
 	refreshCookieName = "refresh_token"
-	// refreshCookiePath ограничивает отправку refresh-токена только на auth-роуты.
 	refreshCookiePath = "/api/v1/auth"
 )
 
-// CookieConfig описывает атрибуты auth-cookie. Значения приходят из env (см. cmd/main.go).
+
 type CookieConfig struct {
 	Secure     bool
 	SameSite   http.SameSite
@@ -22,7 +21,7 @@ type CookieConfig struct {
 	RefreshTTL time.Duration
 }
 
-// ParseSameSite переводит строку из конфига в http.SameSite (по умолчанию Lax).
+
 func ParseSameSite(s string) http.SameSite {
 	switch strings.ToLower(strings.TrimSpace(s)) {
 	case "strict":
