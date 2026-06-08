@@ -7,11 +7,21 @@ import ProductDetailPage from "./pages/ProductDetailPage";
 import AdminPage from "./pages/AdminPage";
 import ProtectedRoute from "./components/ProtectedRoute";
 import AdminRoute from "./components/AdminRoute";
+import { useAuth } from "./lib/AuthContext";
+
+
+function RootRedirect() {
+  const { status } = useAuth();
+  if (status === "loading") {
+    return <p className="info">Загрузка…</p>;
+  }
+  return <Navigate to={status === "authenticated" ? "/catalog" : "/login"} replace />;
+}
 
 export default function App() {
   return (
     <Routes>
-      <Route path="/" element={<Navigate to="/login" replace />} />
+      <Route path="/" element={<RootRedirect />} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
       <Route
@@ -46,7 +56,7 @@ export default function App() {
           </ProtectedRoute>
         }
       />
-      <Route path="*" element={<Navigate to="/login" replace />} />
+      <Route path="*" element={<RootRedirect />} />
     </Routes>
   );
 }

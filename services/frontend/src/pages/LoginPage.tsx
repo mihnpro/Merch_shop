@@ -1,10 +1,11 @@
 import { useState } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { login } from "../api/auth";
-import { saveTokens } from "../lib/tokens";
+import { useAuth } from "../lib/AuthContext";
 
 export default function LoginPage() {
   const location = useLocation();
+  const { status, refresh } = useAuth();
   const justRegistered = (location.state as { registered?: boolean } | null)?.registered;
 
   const [loginValue, setLoginValue] = useState("");
@@ -14,13 +15,17 @@ export default function LoginPage() {
 
   const navigate = useNavigate();
 
+  if (status === "authenticated") {
+    return <Navigate to="/catalog" replace />;
+  }
+
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
     setError("");
     setLoading(true);
     try {
-      const data = await login({ login: loginValue, password });
-      saveTokens(data.tokens.access_token, data.tokens.refresh_token);
+      await login({ login: loginValue, password });
+      await refresh();
       navigate("/catalog");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Не удалось войти");

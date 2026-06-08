@@ -21,11 +21,8 @@ export function login(body: LoginBody): Promise<LoginResponse> {
   });
 }
 
-export function logout(refreshToken: string): Promise<void> {
-  return request<void>("/auth/logout", {
-    method: "POST",
-    body: JSON.stringify({ refresh_token: refreshToken }),
-  });
+export function logout(): Promise<void> {
+  return request<void>("/auth/logout", { method: "POST" });
 }
 
 export function getMe(): Promise<MeResponse> {

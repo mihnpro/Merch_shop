@@ -2,13 +2,14 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { getMe, logout } from "../api/auth";
 import type { MeResponse } from "../api/types";
-import { clearTokens, getRefreshToken } from "../lib/tokens";
+import { useAuth } from "../lib/AuthContext";
 
 export default function ProfilePage() {
   const [me, setMe] = useState<MeResponse | null>(null);
   const [error, setError] = useState("");
 
   const navigate = useNavigate();
+  const { setAnonymous } = useAuth();
 
   useEffect(() => {
     getMe()
@@ -17,11 +18,10 @@ export default function ProfilePage() {
   }, []);
 
   async function handleLogout() {
-    const refreshToken = getRefreshToken();
     try {
-      if (refreshToken) await logout(refreshToken);
+      await logout();
     } finally {
-      clearTokens();
+      setAnonymous();
       navigate("/login");
     }
   }
