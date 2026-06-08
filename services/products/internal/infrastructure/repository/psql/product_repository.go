@@ -31,7 +31,6 @@ type productRow struct {
 	Name        string         `db:"name"`
 	Description string         `db:"description"`
 	PricePoints int64          `db:"price_points"`
-	Sizes       pq.StringArray `db:"sizes"`
 	PhotoKeys   pq.StringArray `db:"photo_keys"`
 	Active      bool           `db:"active"`
 	Version     int            `db:"version"`
@@ -47,10 +46,6 @@ type productRow struct {
 }
 
 func (r *productRow) toModel() *model.Product {
-	sizes := make([]vo.SizeCode, 0, len(r.Sizes))
-	for _, s := range r.Sizes {
-		sizes = append(sizes, vo.NewSizeCodeFromStored(s))
-	}
 	photos := make([]vo.PhotoKey, 0, len(r.PhotoKeys))
 	for _, k := range r.PhotoKeys {
 		photos = append(photos, vo.NewPhotoKeyFromStored(k))
@@ -68,7 +63,6 @@ func (r *productRow) toModel() *model.Product {
 			CreatedAt: r.CategoryCreatedAt,
 			UpdatedAt: r.CategoryUpdatedAt,
 		},
-		Sizes:     sizes,
 		PhotoKeys: photos,
 		Active:    r.Active,
 		Version:   r.Version,
@@ -78,26 +72,58 @@ func (r *productRow) toModel() *model.Product {
 }
 
 const selectProductColumns = `
-	p.id, p.name, p.description, p.price_points, p.sizes, p.photo_keys,
+	p.id, p.name, p.description, p.price_points,
+	COALESCE(
+		(SELECT array_agg(pp.photo_key ORDER BY pp.position)
+		 FROM product_photos pp WHERE pp.product_id = p.id),
+		'{}') AS photo_keys,
 	p.active, p.version, p.created_at, p.updated_at,
 	c.id AS category_id, c.code AS category_code, c.name AS category_name,
 	c.active AS category_active, c.created_at AS category_created_at, c.updated_at AS category_updated_at`
 
 const insertProduct = `
-	INSERT INTO products (name, description, price_points, category_id, sizes, photo_keys)
-	VALUES ($1, $2, $3, $4, $5, $6)
+	INSERT INTO products (name, description, price_points, category_id)
+	VALUES ($1, $2, $3, $4)
 	RETURNING id, active, version, created_at, updated_at`
 
+const insertProductPhoto = `
+	INSERT INTO product_photos (product_id, photo_key, position)
+	VALUES ($1, $2, $3)`
+
+const deleteProductPhotos = `DELETE FROM product_photos WHERE product_id = $1`
+
+
+func insertPhotos(ctx context.Context, tx *sqlx.Tx, productID uuid.UUID, keys []string) error {
+	for i, k := range keys {
+		if _, err := tx.ExecContext(ctx, insertProductPhoto, productID, k, i); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (r *productRepository) Create(ctx context.Context, p *model.Product) (*model.Product, error) {
-	err := r.db.QueryRowContext(ctx, insertProduct,
+	tx, err := r.db.BeginTxx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	err = tx.QueryRowContext(ctx, insertProduct,
 		p.Name,
 		p.Description,
 		p.Price.Int64(),
 		p.Category.ID,
-		pq.Array(p.SizeCodes()),
-		pq.Array(p.PhotoKeyStrings()),
 	).Scan(&p.ID, &p.Active, &p.Version, &p.CreatedAt, &p.UpdatedAt)
 	if err != nil {
+		return nil, err
+	}
+
+	if err := insertPhotos(ctx, tx, p.ID, p.PhotoKeyStrings()); err != nil {
+		return nil, err
+	}
+
+	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
 	return p, nil
@@ -123,18 +149,22 @@ func (r *productRepository) GetByID(ctx context.Context, id uuid.UUID) (*model.P
 const updateProduct = `
 	UPDATE products
 	SET name = $1, description = $2, price_points = $3, category_id = $4,
-	    sizes = $5, photo_keys = $6, active = $7, version = version + 1, updated_at = NOW()
-	WHERE id = $8 AND version = $9
+	    active = $5, version = version + 1, updated_at = NOW()
+	WHERE id = $6 AND version = $7
 	RETURNING version, updated_at`
 
 func (r *productRepository) Update(ctx context.Context, p *model.Product, expectedVersion int) (*model.Product, error) {
-	err := r.db.QueryRowContext(ctx, updateProduct,
+	tx, err := r.db.BeginTxx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	err = tx.QueryRowContext(ctx, updateProduct,
 		p.Name,
 		p.Description,
 		p.Price.Int64(),
 		p.Category.ID,
-		pq.Array(p.SizeCodes()),
-		pq.Array(p.PhotoKeyStrings()),
 		p.Active,
 		p.ID,
 		expectedVersion,
@@ -143,6 +173,17 @@ func (r *productRepository) Update(ctx context.Context, p *model.Product, expect
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, r.conflictOrNotFound(ctx, p.ID)
 		}
+		return nil, err
+	}
+
+	if _, err := tx.ExecContext(ctx, deleteProductPhotos, p.ID); err != nil {
+		return nil, err
+	}
+	if err := insertPhotos(ctx, tx, p.ID, p.PhotoKeyStrings()); err != nil {
+		return nil, err
+	}
+
+	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
 	return p, nil
