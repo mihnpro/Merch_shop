@@ -15,7 +15,6 @@ type CreateProductInput struct {
 	Description string
 	PricePoints int64
 	CategoryID  uuid.UUID
-	Sizes       []string
 	PhotoKeys   []string
 }
 
@@ -26,7 +25,6 @@ type UpdateProductInput struct {
 	Description string
 	PricePoints int64
 	CategoryID  uuid.UUID
-	Sizes       []string
 	PhotoKeys   []string
 	Active      bool
 	Version     int
@@ -50,15 +48,11 @@ func (f *ProductFactory) Create(ctx context.Context, in CreateProductInput) (*mo
 	if err != nil {
 		return nil, err
 	}
-	sizes, err := buildSizes(in.Sizes)
-	if err != nil {
-		return nil, err
-	}
 	category, err := f.categories.GetByID(ctx, in.CategoryID)
 	if err != nil {
 		return nil, err
 	}
-	return model.NewProduct(in.Name, in.Description, price, *category, sizes, photos)
+	return model.NewProduct(in.Name, in.Description, price, *category, photos)
 }
 
 
@@ -75,35 +69,16 @@ func (f *ProductFactory) Update(ctx context.Context, in UpdateProductInput) (*mo
 	if err != nil {
 		return nil, err
 	}
-	sizes, err := buildSizes(in.Sizes)
-	if err != nil {
-		return nil, err
-	}
 	category, err := f.categories.GetByID(ctx, in.CategoryID)
 	if err != nil {
 		return nil, err
 	}
-	if err := product.ApplyUpdate(in.Name, in.Description, price, *category, sizes, photos, in.Active, in.Version); err != nil {
+	if err := product.ApplyUpdate(in.Name, in.Description, price, *category, photos, in.Active, in.Version); err != nil {
 		return nil, err
 	}
 	return product, nil
 }
 
-
-func buildSizes(raw []string) ([]vo.SizeCode, error) {
-	if len(raw) == 0 {
-		return nil, nil
-	}
-	sizes := make([]vo.SizeCode, 0, len(raw))
-	for _, r := range raw {
-		code, err := vo.NewSizeCode(r)
-		if err != nil {
-			return nil, err
-		}
-		sizes = append(sizes, code)
-	}
-	return sizes, nil
-}
 
 func buildPhotoKeys(raw []string) ([]vo.PhotoKey, error) {
 	if len(raw) == 0 {
