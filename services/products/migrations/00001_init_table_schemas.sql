@@ -14,14 +14,14 @@ $$ LANGUAGE plpgsql;
 
 -- Справочник категорий товаров.
 CREATE TABLE categories (
-    id          UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
-    code        TEXT         NOT NULL UNIQUE
-                             CHECK (code ~ '^[a-z_]{1,30}$'),
-    name        TEXT         NOT NULL
-                             CHECK (length(name) BETWEEN 1 AND 100),
-    active      BOOLEAN      NOT NULL DEFAULT TRUE,
-    created_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
-    updated_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+    id          UUID          PRIMARY KEY DEFAULT gen_random_uuid(),
+    code        VARCHAR(30)   NOT NULL UNIQUE
+                              CHECK (code ~ '^[a-z_]{1,30}$'),
+    name        VARCHAR(100)  NOT NULL
+                              CHECK (length(name) BETWEEN 1 AND 100),
+    active      BOOLEAN       NOT NULL DEFAULT TRUE,
+    created_at  TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
+    updated_at  TIMESTAMPTZ   NOT NULL DEFAULT NOW()
 );
 
 CREATE TRIGGER trg_categories_touch
@@ -30,23 +30,19 @@ CREATE TRIGGER trg_categories_touch
 
 -- Товары каталога.
 CREATE TABLE products (
-    id            UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
-    name          TEXT         NOT NULL
-                               CHECK (length(name) BETWEEN 1 AND 500),
-    description   TEXT         NOT NULL
-                               CHECK (length(description) BETWEEN 1 AND 5000),
-    price_points  BIGINT       NOT NULL
-                               CHECK (price_points > 0),
-    category_id   UUID         NOT NULL REFERENCES categories(id) ON DELETE RESTRICT,
-    sizes         TEXT[]       NOT NULL DEFAULT '{}'
-                               CHECK (array_position(sizes, NULL) IS NULL),
-    photo_key     TEXT         CHECK (photo_key IS NULL
-                                      OR photo_key ~ '^products/[0-9a-fA-F-]{36}\.(jpg|jpeg|png|webp)$'),
-    active        BOOLEAN      NOT NULL DEFAULT TRUE,
-    version       INT          NOT NULL DEFAULT 1
-                               CHECK (version >= 1),
-    created_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
-    updated_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+    id            UUID          PRIMARY KEY DEFAULT gen_random_uuid(),
+    name          VARCHAR(500)  NOT NULL
+                                CHECK (length(name) BETWEEN 1 AND 500),
+    description   TEXT          NOT NULL
+                                CHECK (length(description) BETWEEN 1 AND 5000),
+    price_points  BIGINT        NOT NULL
+                                CHECK (price_points > 0),
+    category_id   UUID          NOT NULL REFERENCES categories(id) ON DELETE RESTRICT,
+    active        BOOLEAN       NOT NULL DEFAULT TRUE,
+    version       INT           NOT NULL DEFAULT 1
+                                CHECK (version >= 1),
+    created_at    TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
+    updated_at    TIMESTAMPTZ   NOT NULL DEFAULT NOW()
 );
 
 CREATE TRIGGER trg_products_touch
@@ -61,6 +57,22 @@ CREATE INDEX products_category_active_idx
 CREATE INDEX products_created_idx
     ON products (created_at DESC, id DESC);
 
+-- Фотографии товара: нормализованная связь один-ко-многим.
+CREATE TABLE product_photos (
+    id          UUID          PRIMARY KEY DEFAULT gen_random_uuid(),
+    product_id  UUID          NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+    photo_key   VARCHAR(100)  NOT NULL
+                              CHECK (photo_key ~ '^products/[0-9a-fA-F-]{36}\.(jpg|jpeg|png|webp)$'),
+    position    INT           NOT NULL DEFAULT 0
+                              CHECK (position >= 0),
+    created_at  TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
+    UNIQUE (product_id, position)
+);
+
+-- Выборка фото товара в порядке отображения (обложка = position 0).
+CREATE INDEX product_photos_product_idx
+    ON product_photos (product_id, position);
+
 -- Seed: базовые категории.
 INSERT INTO categories (code, name) VALUES
     ('clothing',    'Одежда'),
@@ -68,6 +80,7 @@ INSERT INTO categories (code, name) VALUES
 
 -- +goose Down
 
+DROP TABLE IF EXISTS product_photos;
 DROP TABLE IF EXISTS products;
 DROP TABLE IF EXISTS categories;
 
