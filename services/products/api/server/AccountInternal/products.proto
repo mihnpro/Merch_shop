@@ -29,9 +29,8 @@ message Product {
     string id           = 1;
     string name         = 2;
     string description  = 3;
-    int64  price_points = 4;                 
-    Category category   = 5;                 
-    repeated string sizes = 6;
+    int64  price_points = 4;
+    Category category   = 5;
     repeated string photo_keys = 7;
     bool   active       = 8;
     int32  version      = 9;                 
@@ -74,9 +73,8 @@ message GetProductRequest {
 message CreateProductRequest {
     string name           = 1;
     string description     = 2;
-    int64  price_points   = 3;               
+    int64  price_points   = 3;
     string category_id    = 4;
-    repeated string sizes = 5;
     repeated string photo_keys = 6;
 }
 
@@ -87,7 +85,6 @@ message UpdateProductRequest {
     string description     = 3;
     int64  price_points   = 4;
     string category_id    = 5;
-    repeated string sizes = 6;
     repeated string photo_keys = 7;
     int32  version        = 8;
     bool   active         = 9;        
