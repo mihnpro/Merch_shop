@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { register } from "../api/auth";
+import { login, register } from "../api/auth";
 import type { RegisterBody } from "../api/types";
+import { useAuth } from "../lib/AuthContext";
 
 const EMPTY_FORM: RegisterBody = {
   login: "",
@@ -19,6 +20,7 @@ export default function RegisterPage() {
   const [loading, setLoading] = useState(false);
 
   const navigate = useNavigate();
+  const { refresh } = useAuth();
 
   function handleChange(event: React.ChangeEvent<HTMLInputElement>) {
     const { name, value } = event.target;
@@ -29,11 +31,22 @@ export default function RegisterPage() {
     event.preventDefault();
     setError("");
     setLoading(true);
+
     try {
       await register(form);
-      navigate("/login", { state: { registered: true } });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Не удалось зарегистрироваться");
+      setLoading(false);
+      return;
+    }
+
+    try {
+      await login({ login: form.login, password: form.password });
+      await refresh();
+      navigate("/catalog");
+    } catch {
+
+      navigate("/login", { state: { registered: true } });
     } finally {
       setLoading(false);
     }
