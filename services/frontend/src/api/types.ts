@@ -47,7 +47,6 @@ export interface Product {
   description: string;
   price_points: number;
   category: Category;
-  sizes: string[];
   photo_keys: string[];
   active: boolean;
   version: number;
@@ -77,7 +76,6 @@ export interface ProductInput {
   description: string;
   price_points: number;
   category_id: string;
-  sizes: string[];
   photo_keys: string[];
 }
 
