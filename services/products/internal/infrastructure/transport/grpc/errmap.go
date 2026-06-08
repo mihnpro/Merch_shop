@@ -27,8 +27,6 @@ func NewGRPCError(err error) error {
 		return status.Error(codes.InvalidArgument, "invalid photo key format")
 	case errors.Is(err, domain.ErrInvalidCategoryCode):
 		return status.Error(codes.InvalidArgument, "invalid category code")
-	case errors.Is(err, domain.ErrInvalidSizeCode):
-		return status.Error(codes.InvalidArgument, "invalid size code")
 	case errors.Is(err, domain.ErrEmptyName):
 		return status.Error(codes.InvalidArgument, "product name cannot be empty")
 	case errors.Is(err, domain.ErrNameTooLong):
