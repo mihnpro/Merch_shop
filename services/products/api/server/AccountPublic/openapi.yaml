@@ -271,13 +271,10 @@ components:
         price_points: { type: integer, format: int64 }
         category:
           $ref: "#/components/schemas/Category"
-        sizes:
+        photo_keys:
           type: array
           items: { type: string }
-          description: Необязательный набор кодов размеров (XS, S, M, …)
-        photo_key:
-          type: string
-          description: Ключ фото в MinIO ("products/{uuid}.{ext}"); пусто, если фото нет
+          description: Ключи фото в MinIO ("products/{uuid}.{ext}") по порядку; первый — обложка
         active: { type: boolean }
         version: { type: integer, format: int32 }
         created_at: { type: string, format: date-time }
@@ -301,10 +298,9 @@ components:
         description: { type: string, minLength: 1, maxLength: 5000 }
         price_points: { type: integer, format: int64, minimum: 1 }
         category_id: { type: string, format: uuid }
-        sizes:
+        photo_keys:
           type: array
           items: { type: string }
-        photo_key: { type: string }
 
     UpdateProductRequest:
       type: object
@@ -314,10 +310,9 @@ components:
         description: { type: string, minLength: 1, maxLength: 5000 }
         price_points: { type: integer, format: int64, minimum: 1 }
         category_id: { type: string, format: uuid }
-        sizes:
+        photo_keys:
           type: array
           items: { type: string }
-        photo_key: { type: string }
         version:
           type: integer
           format: int32

@@ -46,7 +46,6 @@ func (s *catalogService) CreateProduct(ctx context.Context, in dto.CreateProduct
 		Description: in.Description,
 		PricePoints: in.PricePoints,
 		CategoryID:  categoryID,
-		Sizes:       in.Sizes,
 		PhotoKeys:   in.PhotoKeys,
 	})
 	if err != nil {
@@ -76,7 +75,6 @@ func (s *catalogService) UpdateProduct(ctx context.Context, in dto.UpdateProduct
 		Description: in.Description,
 		PricePoints: in.PricePoints,
 		CategoryID:  categoryID,
-		Sizes:       in.Sizes,
 		PhotoKeys:   in.PhotoKeys,
 		Active:      in.Active,
 		Version:     in.Version,

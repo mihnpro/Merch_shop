@@ -22,7 +22,6 @@ type Product struct {
 	Description string
 	Price       vo.PricePoints
 	Category    Category
-	Sizes       []vo.SizeCode
 	PhotoKeys   []vo.PhotoKey
 	Active      bool
 	Version     int
@@ -30,13 +29,12 @@ type Product struct {
 	UpdatedAt   time.Time
 }
 
-func NewProduct(name, description string, price vo.PricePoints, category Category, sizes []vo.SizeCode, photoKeys []vo.PhotoKey) (*Product, error) {
+func NewProduct(name, description string, price vo.PricePoints, category Category, photoKeys []vo.PhotoKey) (*Product, error) {
 	p := &Product{
 		Name:        strings.TrimSpace(name),
 		Description: strings.TrimSpace(description),
 		Price:       price,
 		Category:    category,
-		Sizes:       sizes,
 		PhotoKeys:   photoKeys,
 		Active:      true,
 		Version:     1,
@@ -74,7 +72,7 @@ func (p *Product) Validate() error {
 	return nil
 }
 
-func (p *Product) ApplyUpdate(name, description string, price vo.PricePoints, category Category, sizes []vo.SizeCode, photoKeys []vo.PhotoKey, active bool, expectedVersion int) error {
+func (p *Product) ApplyUpdate(name, description string, price vo.PricePoints, category Category, photoKeys []vo.PhotoKey, active bool, expectedVersion int) error {
 	if p.Version != expectedVersion {
 		return domain.ErrVersionConflict
 	}
@@ -82,7 +80,6 @@ func (p *Product) ApplyUpdate(name, description string, price vo.PricePoints, ca
 	p.Description = strings.TrimSpace(description)
 	p.Price = price
 	p.Category = category
-	p.Sizes = sizes
 	p.PhotoKeys = photoKeys
 	p.Active = active
 	return p.Validate()
@@ -91,14 +88,6 @@ func (p *Product) ApplyUpdate(name, description string, price vo.PricePoints, ca
 
 func (p *Product) Deactivate() {
 	p.Active = false
-}
-
-func (p *Product) SizeCodes() []string {
-	codes := make([]string, 0, len(p.Sizes))
-	for _, s := range p.Sizes {
-		codes = append(codes, s.String())
-	}
-	return codes
 }
 
 func (p *Product) PhotoKeyStrings() []string {

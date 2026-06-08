@@ -6,10 +6,13 @@ import (
 	"strings"
 )
 
-const bearerPrefix = "Bearer "
+const (
+	bearerPrefix     = "Bearer "
+	accessCookieName = "access_token"
+)
 
 func (m *Middleware) Authorize(w http.ResponseWriter, r *http.Request) bool {
-	token, ok := bearerToken(r)
+	token, ok := accessToken(r)
 	if !ok {
 		unauthorized(w)
 		return false
@@ -19,17 +22,20 @@ func (m *Middleware) Authorize(w http.ResponseWriter, r *http.Request) bool {
 		unauthorized(w)
 		return false
 	}
-
+	r.Header.Set("Authorization", bearerPrefix+token)
 	return true
 }
 
-func bearerToken(r *http.Request) (string, bool) {
-	h := r.Header.Get("Authorization")
-	if !strings.HasPrefix(h, bearerPrefix) {
-		return "", false
+func accessToken(r *http.Request) (string, bool) {
+	if h := r.Header.Get("Authorization"); strings.HasPrefix(h, bearerPrefix) {
+		if token := strings.TrimSpace(strings.TrimPrefix(h, bearerPrefix)); token != "" {
+			return token, true
+		}
 	}
-	token := strings.TrimSpace(strings.TrimPrefix(h, bearerPrefix))
-	return token, token != ""
+	if c, err := r.Cookie(accessCookieName); err == nil && c.Value != "" {
+		return c.Value, true
+	}
+	return "", false
 }
 
 func unauthorized(w http.ResponseWriter) {

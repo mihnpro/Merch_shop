@@ -8,11 +8,6 @@ export interface User {
   phone_number?: string;
 }
 
-export interface Tokens {
-  access_token: string;
-  refresh_token: string;
-}
-
 export interface RegisterBody {
   login: string;
   password: string;
@@ -30,7 +25,6 @@ export interface LoginBody {
 
 export interface LoginResponse {
   user: User;
-  tokens: Tokens;
 }
 
 export interface MeResponse {
@@ -53,7 +47,6 @@ export interface Product {
   description: string;
   price_points: number;
   category: Category;
-  sizes: string[];
   photo_keys: string[];
   active: boolean;
   version: number;
@@ -83,7 +76,6 @@ export interface ProductInput {
   description: string;
   price_points: number;
   category_id: string;
-  sizes: string[];
   photo_keys: string[];
 }
 

@@ -1,9 +1,14 @@
 import type { ReactNode } from "react";
 import { Navigate } from "react-router-dom";
-import { getAccessToken } from "../lib/tokens";
+import { useAuth } from "../lib/AuthContext";
 
 export default function ProtectedRoute({ children }: { children: ReactNode }) {
-  if (!getAccessToken()) {
+  const { status } = useAuth();
+
+  if (status === "loading") {
+    return <p className="info">Загрузка…</p>;
+  }
+  if (status === "anonymous") {
     return <Navigate to="/login" replace />;
   }
   return <>{children}</>;

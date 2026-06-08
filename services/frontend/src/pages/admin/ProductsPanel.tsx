@@ -4,13 +4,6 @@ import { createProduct, deactivateProduct, updateProduct } from "../../api/admin
 import type { Category, Product } from "../../api/types";
 import PhotoGalleryUpload from "../../components/PhotoGalleryUpload";
 
-function parseSizes(raw: string): string[] {
-  return raw
-    .split(",")
-    .map((s) => s.trim())
-    .filter((s) => s.length > 0);
-}
-
 export default function ProductsPanel() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
@@ -22,7 +15,6 @@ export default function ProductsPanel() {
   const [description, setDescription] = useState("");
   const [price, setPrice] = useState("");
   const [categoryId, setCategoryId] = useState("");
-  const [sizes, setSizes] = useState("");
   const [photoKeys, setPhotoKeys] = useState<string[]>([]);
 
   async function reload() {
@@ -52,13 +44,11 @@ export default function ProductsPanel() {
         description: description.trim(),
         price_points: Number(price),
         category_id: categoryId,
-        sizes: parseSizes(sizes),
         photo_keys: photoKeys,
       });
       setName("");
       setDescription("");
       setPrice("");
-      setSizes("");
       setPhotoKeys([]);
       setInfo("Товар создан");
       await reload();
@@ -88,7 +78,6 @@ export default function ProductsPanel() {
         description: p.description,
         price_points: p.price_points,
         category_id: p.category.id,
-        sizes: p.sizes,
         photo_keys: p.photo_keys,
         active: true,
         version: p.version,
@@ -129,10 +118,6 @@ export default function ProductsPanel() {
               ))}
             </select>
           </label>
-          <label>
-            Размеры (через запятую)
-            <input value={sizes} onChange={(e) => setSizes(e.target.value)} placeholder="XS, S, M, L" />
-          </label>
         </div>
         <PhotoGalleryUpload value={photoKeys} onChange={setPhotoKeys} />
         <button type="submit">Создать товар</button>
@@ -148,7 +133,6 @@ export default function ProductsPanel() {
             <th>Название</th>
             <th>Категория</th>
             <th>Цена</th>
-            <th>Размеры</th>
             <th>Активен</th>
             <th></th>
           </tr>
@@ -192,7 +176,6 @@ function ProductRow({
   const [description, setDescription] = useState(product.description);
   const [price, setPrice] = useState(String(product.price_points));
   const [categoryId, setCategoryId] = useState(product.category.id);
-  const [sizes, setSizes] = useState(product.sizes.join(", "));
   const [photoKeys, setPhotoKeys] = useState<string[]>(product.photo_keys);
 
   async function save() {
@@ -203,7 +186,6 @@ function ProductRow({
         description: description.trim(),
         price_points: Number(price),
         category_id: categoryId,
-        sizes: parseSizes(sizes),
         photo_keys: photoKeys,
         active: product.active,
         version: product.version,
@@ -222,7 +204,6 @@ function ProductRow({
         <td>{product.name}</td>
         <td>{product.category.name}</td>
         <td>{product.price_points}</td>
-        <td>{product.sizes.join(", ") || "—"}</td>
         <td>{product.active ? "да" : "нет"}</td>
         <td className="actions">
           <button type="button" className="btn-secondary" onClick={() => setEditing(true)}>
@@ -260,9 +241,6 @@ function ProductRow({
       </td>
       <td>
         <input type="number" min={1} value={price} onChange={(e) => setPrice(e.target.value)} />
-      </td>
-      <td>
-        <input value={sizes} onChange={(e) => setSizes(e.target.value)} placeholder="XS, S, M" />
       </td>
       <td>{product.active ? "да" : "нет"}</td>
       <td className="actions">

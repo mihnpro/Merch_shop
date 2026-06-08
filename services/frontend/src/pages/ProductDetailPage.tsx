@@ -62,15 +62,6 @@ export default function ProductDetailPage() {
             <h1>{product.name}</h1>
             <p className="muted">{product.category.name}</p>
             <p className="price">{product.price_points} баллов</p>
-            {product.sizes.length > 0 && (
-              <div className="chips">
-                {product.sizes.map((s) => (
-                  <span key={s} className="chip">
-                    {s}
-                  </span>
-                ))}
-              </div>
-            )}
             <p className="desc">{product.description}</p>
             {!product.active && <p className="muted">Товар скрыт из каталога</p>}
           </div>

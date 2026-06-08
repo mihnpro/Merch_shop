@@ -31,7 +31,6 @@ type Product struct {
 	Description   string                 `protobuf:"bytes,3,opt,name=description,proto3" json:"description,omitempty"`
 	PricePoints   int64                  `protobuf:"varint,4,opt,name=price_points,json=pricePoints,proto3" json:"price_points,omitempty"`
 	Category      *Category              `protobuf:"bytes,5,opt,name=category,proto3" json:"category,omitempty"`
-	Sizes         []string               `protobuf:"bytes,6,rep,name=sizes,proto3" json:"sizes,omitempty"`
 	PhotoKeys     []string               `protobuf:"bytes,7,rep,name=photo_keys,json=photoKeys,proto3" json:"photo_keys,omitempty"`
 	Active        bool                   `protobuf:"varint,8,opt,name=active,proto3" json:"active,omitempty"`
 	Version       int32                  `protobuf:"varint,9,opt,name=version,proto3" json:"version,omitempty"`
@@ -102,13 +101,6 @@ func (x *Product) GetPricePoints() int64 {
 func (x *Product) GetCategory() *Category {
 	if x != nil {
 		return x.Category
-	}
-	return nil
-}
-
-func (x *Product) GetSizes() []string {
-	if x != nil {
-		return x.Sizes
 	}
 	return nil
 }
@@ -415,7 +407,6 @@ type CreateProductRequest struct {
 	Description   string                 `protobuf:"bytes,2,opt,name=description,proto3" json:"description,omitempty"`
 	PricePoints   int64                  `protobuf:"varint,3,opt,name=price_points,json=pricePoints,proto3" json:"price_points,omitempty"`
 	CategoryId    string                 `protobuf:"bytes,4,opt,name=category_id,json=categoryId,proto3" json:"category_id,omitempty"`
-	Sizes         []string               `protobuf:"bytes,5,rep,name=sizes,proto3" json:"sizes,omitempty"`
 	PhotoKeys     []string               `protobuf:"bytes,6,rep,name=photo_keys,json=photoKeys,proto3" json:"photo_keys,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -479,13 +470,6 @@ func (x *CreateProductRequest) GetCategoryId() string {
 	return ""
 }
 
-func (x *CreateProductRequest) GetSizes() []string {
-	if x != nil {
-		return x.Sizes
-	}
-	return nil
-}
-
 func (x *CreateProductRequest) GetPhotoKeys() []string {
 	if x != nil {
 		return x.PhotoKeys
@@ -501,10 +485,9 @@ type UpdateProductRequest struct {
 	Description   string                 `protobuf:"bytes,3,opt,name=description,proto3" json:"description,omitempty"`
 	PricePoints   int64                  `protobuf:"varint,4,opt,name=price_points,json=pricePoints,proto3" json:"price_points,omitempty"`
 	CategoryId    string                 `protobuf:"bytes,5,opt,name=category_id,json=categoryId,proto3" json:"category_id,omitempty"`
-	Sizes         []string               `protobuf:"bytes,6,rep,name=sizes,proto3" json:"sizes,omitempty"`
 	PhotoKeys     []string               `protobuf:"bytes,7,rep,name=photo_keys,json=photoKeys,proto3" json:"photo_keys,omitempty"`
 	Version       int32                  `protobuf:"varint,8,opt,name=version,proto3" json:"version,omitempty"`
-	Active        bool                   `protobuf:"varint,9,opt,name=active,proto3" json:"active,omitempty"` // статус товара (true — активен, false — скрыт)
+	Active        bool                   `protobuf:"varint,9,opt,name=active,proto3" json:"active,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -572,13 +555,6 @@ func (x *UpdateProductRequest) GetCategoryId() string {
 		return x.CategoryId
 	}
 	return ""
-}
-
-func (x *UpdateProductRequest) GetSizes() []string {
-	if x != nil {
-		return x.Sizes
-	}
-	return nil
 }
 
 func (x *UpdateProductRequest) GetPhotoKeys() []string {
@@ -855,14 +831,13 @@ var File_products_proto protoreflect.FileDescriptor
 
 const file_products_proto_rawDesc = "" +
 	"\n" +
-	"\x0eproducts.proto\x12\bproducts\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1bgoogle/protobuf/empty.proto\"\xff\x02\n" +
+	"\x0eproducts.proto\x12\bproducts\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1bgoogle/protobuf/empty.proto\"\xe9\x02\n" +
 	"\aProduct\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12 \n" +
 	"\vdescription\x18\x03 \x01(\tR\vdescription\x12!\n" +
 	"\fprice_points\x18\x04 \x01(\x03R\vpricePoints\x12.\n" +
-	"\bcategory\x18\x05 \x01(\v2\x12.products.CategoryR\bcategory\x12\x14\n" +
-	"\x05sizes\x18\x06 \x03(\tR\x05sizes\x12\x1d\n" +
+	"\bcategory\x18\x05 \x01(\v2\x12.products.CategoryR\bcategory\x12\x1d\n" +
 	"\n" +
 	"photo_keys\x18\a \x03(\tR\tphotoKeys\x12\x16\n" +
 	"\x06active\x18\b \x01(\bR\x06active\x12\x18\n" +
@@ -895,16 +870,15 @@ const file_products_proto_rawDesc = "" +
 	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken\"2\n" +
 	"\x11GetProductRequest\x12\x1d\n" +
 	"\n" +
-	"product_id\x18\x01 \x01(\tR\tproductId\"\xc5\x01\n" +
+	"product_id\x18\x01 \x01(\tR\tproductId\"\xaf\x01\n" +
 	"\x14CreateProductRequest\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12 \n" +
 	"\vdescription\x18\x02 \x01(\tR\vdescription\x12!\n" +
 	"\fprice_points\x18\x03 \x01(\x03R\vpricePoints\x12\x1f\n" +
 	"\vcategory_id\x18\x04 \x01(\tR\n" +
-	"categoryId\x12\x14\n" +
-	"\x05sizes\x18\x05 \x03(\tR\x05sizes\x12\x1d\n" +
+	"categoryId\x12\x1d\n" +
 	"\n" +
-	"photo_keys\x18\x06 \x03(\tR\tphotoKeys\"\x96\x02\n" +
+	"photo_keys\x18\x06 \x03(\tR\tphotoKeys\"\x80\x02\n" +
 	"\x14UpdateProductRequest\x12\x1d\n" +
 	"\n" +
 	"product_id\x18\x01 \x01(\tR\tproductId\x12\x12\n" +
@@ -912,8 +886,7 @@ const file_products_proto_rawDesc = "" +
 	"\vdescription\x18\x03 \x01(\tR\vdescription\x12!\n" +
 	"\fprice_points\x18\x04 \x01(\x03R\vpricePoints\x12\x1f\n" +
 	"\vcategory_id\x18\x05 \x01(\tR\n" +
-	"categoryId\x12\x14\n" +
-	"\x05sizes\x18\x06 \x03(\tR\x05sizes\x12\x1d\n" +
+	"categoryId\x12\x1d\n" +
 	"\n" +
 	"photo_keys\x18\a \x03(\tR\tphotoKeys\x12\x18\n" +
 	"\aversion\x18\b \x01(\x05R\aversion\x12\x16\n" +

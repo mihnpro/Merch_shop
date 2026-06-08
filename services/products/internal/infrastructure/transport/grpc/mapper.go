@@ -15,7 +15,6 @@ func toCreateProductInput(req *productpb.CreateProductRequest) dto.CreateProduct
 		Description: req.GetDescription(),
 		PricePoints: req.GetPricePoints(),
 		CategoryID:  req.GetCategoryId(),
-		Sizes:       req.GetSizes(),
 		PhotoKeys:   req.GetPhotoKeys(),
 	}
 }
@@ -27,7 +26,6 @@ func toUpdateProductInput(req *productpb.UpdateProductRequest) dto.UpdateProduct
 		Description: req.GetDescription(),
 		PricePoints: req.GetPricePoints(),
 		CategoryID:  req.GetCategoryId(),
-		Sizes:       req.GetSizes(),
 		PhotoKeys:   req.GetPhotoKeys(),
 		Active:      req.GetActive(),
 		Version:     int(req.GetVersion()),
@@ -78,7 +76,6 @@ func toProductProto(v dto.ProductView) *productpb.Product {
 		Description: v.Description,
 		PricePoints: v.PricePoints,
 		Category:    toCategoryProto(v.Category),
-		Sizes:       v.Sizes,
 		PhotoKeys:   v.PhotoKeys,
 		Active:      v.Active,
 		Version:     int32(v.Version),

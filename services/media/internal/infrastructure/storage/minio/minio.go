@@ -11,6 +11,8 @@ import (
 	"github.com/mihnpro/Merch_shop/services/media/internal/app/port"
 )
 
+const cacheControl = "public, max-age=31536000, immutable"
+
 type Config struct {
 	Endpoint  string
 	AccessKey string
@@ -53,7 +55,8 @@ func (s *Storage) EnsureBucket(ctx context.Context) error {
 
 func (s *Storage) Put(ctx context.Context, key, contentType string, r io.Reader, size int64) error {
 	_, err := s.client.PutObject(ctx, s.bucket, key, r, size, minio.PutObjectOptions{
-		ContentType: contentType,
+		ContentType:  contentType,
+		CacheControl: cacheControl,
 	})
 	if err != nil {
 		return fmt.Errorf("put object %q: %w", key, err)

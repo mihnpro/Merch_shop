@@ -89,15 +89,6 @@ export default function CatalogPage() {
             <h3>{p.name}</h3>
             <p className="muted">{p.category.name}</p>
             <p className="price">{p.price_points} баллов</p>
-            {p.sizes.length > 0 && (
-              <div className="chips">
-                {p.sizes.map((s) => (
-                  <span key={s} className="chip">
-                    {s}
-                  </span>
-                ))}
-              </div>
-            )}
             <p className="desc">{p.description}</p>
           </Link>
         ))}
