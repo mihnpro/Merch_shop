@@ -23,6 +23,4 @@ var (
 	ErrInvalidCategoryCode   = errors.New("invalid category code")
 	ErrEmptyCategoryName     = errors.New("category name cannot be empty")
 	ErrCategoryNameTooLong   = errors.New("category name is too long")
-
-	ErrInvalidSizeCode = errors.New("invalid size code")
 )

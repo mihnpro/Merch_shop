@@ -21,7 +21,6 @@ func ToProductView(p *model.Product) ProductView {
 		Description: p.Description,
 		PricePoints: p.Price.Int64(),
 		Category:    ToCategoryView(&category),
-		Sizes:       p.SizeCodes(),
 		PhotoKeys:   p.PhotoKeyStrings(),
 		Active:      p.Active,
 		Version:     p.Version,
