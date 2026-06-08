@@ -45,7 +45,6 @@ func mapError(err error) (int, apiError) {
 		errors.Is(err, domain.ErrInvalidPrice),
 		errors.Is(err, domain.ErrInvalidPhotoKey),
 		errors.Is(err, domain.ErrInvalidCategoryCode),
-		errors.Is(err, domain.ErrInvalidSizeCode),
 		errors.Is(err, domain.ErrEmptyName),
 		errors.Is(err, domain.ErrNameTooLong),
 		errors.Is(err, domain.ErrEmptyDescription),

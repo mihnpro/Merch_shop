@@ -24,7 +24,6 @@ type productResponse struct {
 	Description string           `json:"description"`
 	PricePoints int64            `json:"price_points"`
 	Category    categoryResponse `json:"category"`
-	Sizes       []string         `json:"sizes"`
 	PhotoKeys   []string         `json:"photo_keys"`
 	Active      bool             `json:"active"`
 	Version     int              `json:"version"`
@@ -47,7 +46,6 @@ type createProductRequest struct {
 	Description string   `json:"description"`
 	PricePoints int64    `json:"price_points"`
 	CategoryID  string   `json:"category_id"`
-	Sizes       []string `json:"sizes"`
 	PhotoKeys   []string `json:"photo_keys"`
 }
 
@@ -56,7 +54,6 @@ type updateProductRequest struct {
 	Description string   `json:"description"`
 	PricePoints int64    `json:"price_points"`
 	CategoryID  string   `json:"category_id"`
-	Sizes       []string `json:"sizes"`
 	PhotoKeys   []string `json:"photo_keys"`
 	Active      bool     `json:"active"`
 	Version     int      `json:"version"`
@@ -127,7 +124,6 @@ func (s *Server) CreateProduct(w http.ResponseWriter, r *http.Request) {
 		Description: req.Description,
 		PricePoints: req.PricePoints,
 		CategoryID:  req.CategoryID,
-		Sizes:       req.Sizes,
 		PhotoKeys:   req.PhotoKeys,
 	})
 	if err != nil {
@@ -148,7 +144,6 @@ func (s *Server) UpdateProduct(w http.ResponseWriter, r *http.Request) {
 		Description: req.Description,
 		PricePoints: req.PricePoints,
 		CategoryID:  req.CategoryID,
-		Sizes:       req.Sizes,
 		PhotoKeys:   req.PhotoKeys,
 		Active:      req.Active,
 		Version:     req.Version,
@@ -212,10 +207,6 @@ func toCategoryResponse(v dto.CategoryView) categoryResponse {
 }
 
 func toProductResponse(v dto.ProductView) productResponse {
-	sizes := v.Sizes
-	if sizes == nil {
-		sizes = []string{}
-	}
 	photoKeys := v.PhotoKeys
 	if photoKeys == nil {
 		photoKeys = []string{}
@@ -226,7 +217,6 @@ func toProductResponse(v dto.ProductView) productResponse {
 		Description: v.Description,
 		PricePoints: v.PricePoints,
 		Category:    toCategoryResponse(v.Category),
-		Sizes:       sizes,
 		PhotoKeys:   photoKeys,
 		Active:      v.Active,
 		Version:     v.Version,
