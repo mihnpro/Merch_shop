@@ -1,0 +1,68 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-merch_service}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "5435:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-merch_service}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  migrate:
+    image: ghcr.io/kukymbr/goose-docker:3.24.1
+    environment:
+      GOOSE_DRIVER: postgres
+      GOOSE_DBSTRING: >-
+        host=postgres port=5432
+        user=${POSTGRES_USER:-postgres}
+        password=${POSTGRES_PASSWORD}
+        dbname=${POSTGRES_DB:-merch_service}
+        sslmode=disable
+    volumes:
+      - ./migrations:/migrations
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  inventory:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-merch_service}
+      POSTGRES_SSLMODE: disable
+      GRPC_PORT: ${GRPC_PORT:-50051}
+      HTTP_PORT: ${HTTP_PORT:-8084}
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET}
+    ports:
+      - "50054:50051"
+      - "${HTTP_PORT:-8084}:8084"
+    networks:
+      - default
+      - shared
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+
+volumes:
+  postgres_data:
+
+networks:
+  shared:
+    external: true
+    name: user_default

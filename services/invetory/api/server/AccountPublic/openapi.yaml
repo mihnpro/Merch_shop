@@ -1,0 +1,149 @@
+openapi: 3.0.3
+info:
+  title: Inventory Service — Public API
+  description: >-
+    Публичные HTTP-эндпоинты inventory-сервиса, доступные через gateway.
+    Раздел /admin требует роль admin. Приватные межсервисные методы
+    (CheckStock, ReserveStock, ReleaseReserve, AdjustStock) описаны
+    gRPC-контрактом в ../AccountInternal/inventory.proto.
+  version: 1.0.0
+
+servers:
+  - url: /api/v1
+    description: Базовый префикс (gateway проксирует по нему в inventory-сервис)
+
+tags:
+  - name: admin
+    description: Управление остатками (только role=admin)
+
+paths:
+  /admin/inventory:
+    get:
+      tags: [admin]
+      summary: Список остатков по всем товарам
+      description: >-
+        Возвращает текущие остатки для отображения в админ-панели. Товары без
+        строки остатка в ответе отсутствуют (трактуются как 0 на стороне клиента).
+      responses:
+        "200":
+          description: Список остатков
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListStockResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /admin/inventory/adjust:
+    post:
+      tags: [admin]
+      summary: Корректировка остатка по дельте (идемпотентно по operation_id)
+      description: >-
+        Изменяет доступное количество товара на delta (положительная — пополнение,
+        отрицательная — списание). Повтор с тем же operation_id не изменяет остаток
+        и возвращает текущее состояние. Результат available + delta не может стать
+        отрицательным.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdjustStockRequest"
+      responses:
+        "200":
+          description: Остаток скорректирован (или повтор по operation_id)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdjustStockResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          $ref: "#/components/responses/Conflict"
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  responses:
+    BadRequest:
+      description: Некорректный запрос / ошибка валидации (в т.ч. результат < 0)
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    Unauthorized:
+      description: Отсутствует или невалиден токен
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    Forbidden:
+      description: Недостаточно прав (требуется role=admin)
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    Conflict:
+      description: Конфликт версии при конкурентной корректировке остатка
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+
+  schemas:
+    AdjustStockRequest:
+      type: object
+      required: [product_id, delta, operation_id, reason]
+      properties:
+        product_id: { type: string, format: uuid }
+        delta:
+          type: integer
+          format: int32
+          description: Дельта изменения; не равна нулю (+ пополнение, − списание)
+        operation_id:
+          type: string
+          format: uuid
+          description: Ключ идемпотентности; повтор не меняет остаток
+        reason: { type: string, minLength: 1, maxLength: 500 }
+
+    AdjustStockResponse:
+      type: object
+      properties:
+        product_id: { type: string, format: uuid }
+        available:
+          type: integer
+          format: int32
+          description: Доступное количество после корректировки
+        version:
+          type: integer
+          format: int32
+          description: Новая версия остатка (оптимистическая блокировка)
+
+    StockItem:
+      type: object
+      properties:
+        product_id: { type: string, format: uuid }
+        available: { type: integer, format: int32 }
+        version: { type: integer, format: int32 }
+
+    ListStockResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/StockItem" }
+
+    Error:
+      type: object
+      properties:
+        code: { type: string }
+        message: { type: string }
+
+security:
+  - bearerAuth: []
