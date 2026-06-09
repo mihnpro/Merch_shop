@@ -2,6 +2,9 @@ import { request, uploadFile } from "./client";
 import type {
   Category,
   CreateCategoryInput,
+  InventoryAdjustInput,
+  InventoryAdjustResult,
+  ListStockResponse,
   Product,
   ProductInput,
   UpdateCategoryInput,
@@ -41,6 +44,17 @@ export function createCategory(body: CreateCategoryInput): Promise<Category> {
 export function updateCategory(id: string, body: UpdateCategoryInput): Promise<Category> {
   return request<Category>(`/admin/categories/${id}`, {
     method: "PUT",
+    body: JSON.stringify(body),
+  });
+}
+
+export function listInventory(): Promise<ListStockResponse> {
+  return request<ListStockResponse>("/admin/inventory", { method: "GET" });
+}
+
+export function adjustInventory(body: InventoryAdjustInput): Promise<InventoryAdjustResult> {
+  return request<InventoryAdjustResult>("/admin/inventory/adjust", {
+    method: "POST",
     body: JSON.stringify(body),
   });
 }
