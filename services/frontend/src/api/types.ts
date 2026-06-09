@@ -97,3 +97,26 @@ export interface UpdateCategoryInput {
 export interface UploadPhotoResponse {
   photo_key: string;
 }
+
+export interface InventoryAdjustInput {
+  product_id: string;
+  delta: number;
+  operation_id: string;
+  reason: string;
+}
+
+export interface InventoryAdjustResult {
+  product_id: string;
+  available: number;
+  version: number;
+}
+
+export interface StockItem {
+  product_id: string;
+  available: number;
+  version: number;
+}
+
+export interface ListStockResponse {
+  items: StockItem[];
+}
