@@ -1,12 +1,19 @@
 import { useEffect, useState } from "react";
 import { listCategories, listProducts } from "../../api/catalog";
-import { createProduct, deactivateProduct, updateProduct } from "../../api/admin";
+import {
+  adjustInventory,
+  createProduct,
+  deactivateProduct,
+  listInventory,
+  updateProduct,
+} from "../../api/admin";
 import type { Category, Product } from "../../api/types";
 import PhotoGalleryUpload from "../../components/PhotoGalleryUpload";
 
 export default function ProductsPanel() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
+  const [stock, setStock] = useState<Record<string, number>>({});
   const [error, setError] = useState("");
   const [info, setInfo] = useState("");
 
@@ -14,15 +21,23 @@ export default function ProductsPanel() {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [price, setPrice] = useState("");
+  const [quantity, setQuantity] = useState("0");
   const [categoryId, setCategoryId] = useState("");
   const [photoKeys, setPhotoKeys] = useState<string[]>([]);
 
   async function reload() {
     setError("");
     try {
-      const [cats, prods] = await Promise.all([listCategories(false), listProducts({ active_only: false, page_size: 100 })]);
+      const [cats, prods, inv] = await Promise.all([
+        listCategories(false),
+        listProducts({ active_only: false, page_size: 100 }),
+        listInventory(),
+      ]);
       setCategories(cats.categories);
       setProducts(prods.products);
+      const map: Record<string, number> = {};
+      for (const item of inv.items) map[item.product_id] = item.available;
+      setStock(map);
       if (!categoryId && cats.categories.length > 0) setCategoryId(cats.categories[0].id);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Ошибка");
@@ -39,16 +54,27 @@ export default function ProductsPanel() {
     setError("");
     setInfo("");
     try {
-      await createProduct({
+      const created = await createProduct({
         name: name.trim(),
         description: description.trim(),
         price_points: Number(price),
         category_id: categoryId,
         photo_keys: photoKeys,
       });
+      // Начальный остаток задаём отдельным вызовом в inventory-сервис.
+      const initial = Number(quantity);
+      if (Number.isInteger(initial) && initial > 0) {
+        await adjustInventory({
+          product_id: created.id,
+          delta: initial,
+          operation_id: crypto.randomUUID(),
+          reason: "Начальный остаток при создании товара",
+        });
+      }
       setName("");
       setDescription("");
       setPrice("");
+      setQuantity("0");
       setPhotoKeys([]);
       setInfo("Товар создан");
       await reload();
@@ -67,7 +93,6 @@ export default function ProductsPanel() {
       setError(err instanceof Error ? err.message : "Ошибка");
     }
   }
-
 
   async function handleActivate(p: Product) {
     setError("");
@@ -89,6 +114,32 @@ export default function ProductsPanel() {
     }
   }
 
+  // Установка абсолютного остатка: дельту считаем от текущего значения.
+  async function handleSetStock(product: Product, target: number) {
+    setError("");
+    setInfo("");
+    if (!Number.isInteger(target) || target < 0) {
+      setError("Количество должно быть целым числом ≥ 0");
+      return;
+    }
+    const current = stock[product.id] ?? 0;
+    const delta = target - current;
+    if (delta === 0) return;
+    try {
+      const res = await adjustInventory({
+        product_id: product.id,
+        delta,
+        operation_id: crypto.randomUUID(),
+        reason: "Корректировка остатка через админку",
+      });
+      setInfo(`Остаток обновлён: ${product.name} → ${res.available}`);
+      await reload();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Ошибка");
+      await reload();
+    }
+  }
+
   return (
     <div>
       <form className="panel-form" onSubmit={handleCreate}>
@@ -101,6 +152,10 @@ export default function ProductsPanel() {
           <label>
             Цена (баллы)
             <input type="number" min={1} value={price} onChange={(e) => setPrice(e.target.value)} required />
+          </label>
+          <label>
+            Количество
+            <input type="number" min={0} value={quantity} onChange={(e) => setQuantity(e.target.value)} />
           </label>
         </div>
         <label>
@@ -127,30 +182,33 @@ export default function ProductsPanel() {
       {info && <p className="info">{info}</p>}
 
       <div className="table-wrap">
-      <table className="table">
-        <thead>
-          <tr>
-            <th>Название</th>
-            <th>Категория</th>
-            <th>Цена</th>
-            <th>Активен</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody>
-          {products.map((p) => (
-            <ProductRow
-              key={p.id}
-              product={p}
-              categories={categories}
-              onChanged={reload}
-              onError={setError}
-              onDeactivate={handleDeactivate}
-              onActivate={handleActivate}
-            />
-          ))}
-        </tbody>
-      </table>
+        <table className="table">
+          <thead>
+            <tr>
+              <th>Название</th>
+              <th>Категория</th>
+              <th>Цена</th>
+              <th>Количество</th>
+              <th>Активен</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {products.map((p) => (
+              <ProductRow
+                key={p.id}
+                product={p}
+                categories={categories}
+                available={stock[p.id] ?? 0}
+                onChanged={reload}
+                onError={setError}
+                onDeactivate={handleDeactivate}
+                onActivate={handleActivate}
+                onSetStock={handleSetStock}
+              />
+            ))}
+          </tbody>
+        </table>
       </div>
     </div>
   );
@@ -159,17 +217,21 @@ export default function ProductsPanel() {
 function ProductRow({
   product,
   categories,
+  available,
   onChanged,
   onError,
   onDeactivate,
   onActivate,
+  onSetStock,
 }: {
   product: Product;
   categories: Category[];
+  available: number;
   onChanged: () => void;
   onError: (msg: string) => void;
   onDeactivate: (id: string) => void;
   onActivate: (p: Product) => void;
+  onSetStock: (p: Product, target: number) => void;
 }) {
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(product.name);
@@ -194,9 +256,13 @@ function ProductRow({
       onChanged();
     } catch (err) {
       onError(err instanceof Error ? err.message : "Ошибка");
-      onChanged(); 
+      onChanged();
     }
   }
+
+  const stockCell = (
+    <StockCell available={available} onSet={(target) => onSetStock(product, target)} />
+  );
 
   if (!editing) {
     return (
@@ -204,6 +270,7 @@ function ProductRow({
         <td>{product.name}</td>
         <td>{product.category.name}</td>
         <td>{product.price_points}</td>
+        <td>{stockCell}</td>
         <td>{product.active ? "да" : "нет"}</td>
         <td className="actions">
           <button type="button" className="btn-secondary" onClick={() => setEditing(true)}>
@@ -242,6 +309,7 @@ function ProductRow({
       <td>
         <input type="number" min={1} value={price} onChange={(e) => setPrice(e.target.value)} />
       </td>
+      <td>{stockCell}</td>
       <td>{product.active ? "да" : "нет"}</td>
       <td className="actions">
         <button type="button" onClick={save}>
@@ -252,5 +320,34 @@ function ProductRow({
         </button>
       </td>
     </tr>
+  );
+}
+
+// Управление остатком: абсолютное значение, дельту считает родитель.
+function StockCell({ available, onSet }: { available: number; onSet: (target: number) => void }) {
+  const [value, setValue] = useState(String(available));
+
+  useEffect(() => {
+    setValue(String(available));
+  }, [available]);
+
+  return (
+    <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+      <input
+        type="number"
+        min={0}
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        style={{ width: 70 }}
+      />
+      <button
+        type="button"
+        className="btn-secondary"
+        disabled={Number(value) === available}
+        onClick={() => onSet(Number(value))}
+      >
+        OK
+      </button>
+    </div>
   );
 }
