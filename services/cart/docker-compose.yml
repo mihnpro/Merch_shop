@@ -1,0 +1,91 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-merch_cart}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "5436:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-merch_cart}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: >-
+      sh -c
+      'if [ -n "$$REDIS_PASSWORD" ];
+       then exec redis-server --requirepass "$$REDIS_PASSWORD";
+       else exec redis-server;
+       fi'
+    ports:
+      - "6380:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  migrate:
+    image: ghcr.io/kukymbr/goose-docker:3.24.1
+    environment:
+      GOOSE_DRIVER: postgres
+      GOOSE_DBSTRING: >-
+        host=postgres port=5432
+        user=${POSTGRES_USER:-postgres}
+        password=${POSTGRES_PASSWORD}
+        dbname=${POSTGRES_DB:-merch_cart}
+        sslmode=disable
+    volumes:
+      - ./migrations:/migrations
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  cart:
+    build:
+      context: ..
+      dockerfile: cart/Dockerfile
+    restart: unless-stopped
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-merch_cart}
+      POSTGRES_SSLMODE: disable
+      REDIS_ADDR: redis:6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+      PRODUCT_SERVICE_ADDR: ${PRODUCT_SERVICE_ADDR:-product:50051}
+      INVENTORY_SERVICE_ADDR: ${INVENTORY_SERVICE_ADDR:-inventory:50051}
+      GRPC_PORT: ${GRPC_PORT:-50055}
+      HTTP_PORT: ${HTTP_PORT:-8085}
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET}
+    ports:
+      - "50055:50055"
+      - "${HTTP_PORT:-8085}:8085"
+    networks:
+      - default
+      - shared
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+
+volumes:
+  postgres_data:
+
+networks:
+  shared:
+    external: true
+    name: user_default
