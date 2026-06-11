@@ -1,0 +1,93 @@
+syntax = "proto3";
+
+package order.v1;
+
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/mihnpro/Merch_shop/services/order/api/server/AccountInternal;orderpb";
+
+// Order Service — управление заказами.
+// user_id передаётся через gRPC metadata "x-user-id".
+service OrderService {
+    // Создать заказ из текущей корзины.
+    rpc CreateOrder(CreateOrderRequest) returns (OrderResponse);
+
+    // Получить заказ по ID.
+    rpc GetOrder(GetOrderRequest) returns (OrderResponse);
+
+    // Список заказов текущего пользователя.
+    rpc GetMyOrders(GetMyOrdersRequest) returns (GetMyOrdersResponse);
+
+    // Обновить статус заказа (admin или Inventory Service callback).
+    rpc UpdateOrderStatus(UpdateOrderStatusRequest) returns (OrderResponse);
+
+    // Список всех заказов (admin).
+    rpc ListOrders(ListOrdersRequest) returns (ListOrdersResponse);
+}
+
+enum OrderStatus {
+    ORDER_STATUS_UNSPECIFIED    = 0;
+    ORDER_STATUS_PENDING        = 1;
+    ORDER_STATUS_CONFIRMED      = 2;
+    ORDER_STATUS_READY_TO_PICKUP = 3;
+    ORDER_STATUS_DELIVERED      = 4;
+    ORDER_STATUS_CANCELLED      = 5;
+}
+
+message OrderItem {
+    string id           = 1;
+    string product_id   = 2;
+    string product_name = 3;
+    int32  quantity     = 4;
+    int64  price_points = 5;
+}
+
+message Order {
+    string                    id               = 1;
+    string                    user_id          = 2;
+    OrderStatus               status           = 3;
+    int64                     total_points     = 4;
+    string                    delivery_address = 5;
+    repeated OrderItem        items            = 6;
+    google.protobuf.Timestamp created_at       = 7;
+    google.protobuf.Timestamp updated_at       = 8;
+}
+
+message CreateOrderRequest {
+    string delivery_address = 1;
+}
+
+message OrderResponse {
+    Order order = 1;
+}
+
+message GetOrderRequest {
+    string order_id = 1;
+}
+
+message GetMyOrdersRequest {
+    int32  page_size  = 1;
+    string page_token = 2;
+}
+
+message GetMyOrdersResponse {
+    repeated Order orders         = 1;
+    string         next_page_token = 2;
+}
+
+message UpdateOrderStatusRequest {
+    string      order_id   = 1;
+    OrderStatus new_status = 2;
+    string      reason     = 3;
+}
+
+message ListOrdersRequest {
+    OrderStatus status     = 1;
+    int32       page_size  = 2;
+    string      page_token = 3;
+}
+
+message ListOrdersResponse {
+    repeated Order orders          = 1;
+    string         next_page_token = 2;
+}
