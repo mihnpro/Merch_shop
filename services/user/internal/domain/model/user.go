@@ -19,10 +19,11 @@ type User struct {
 	Patronymic       string
 	Email            vo.Email
 	Phone            vo.PhoneNumber
-	Role             string
-	Status           string
+	Role             vo.Role
+	Status           vo.Status
 	FailedLoginCount int
 	LockedUntil      *time.Time
+	LastLoginAt      *time.Time
 	CreatedAt        time.Time
 	UpdatedAt        time.Time
 }
@@ -36,6 +37,8 @@ func NewUser(login vo.Login, hash vo.PasswordHash, firstName, lastName, patronym
 		Patronymic:   strings.TrimSpace(patronymic),
 		Email:        email,
 		Phone:        phone,
+		Role:         vo.RoleUser,
+		Status:       vo.StatusActive,
 	}
 	if err := u.Validate(); err != nil {
 		return nil, err
@@ -67,6 +70,6 @@ func (u *User) Identity() Identity {
 	return Identity{
 		UserID: u.ID,
 		Email:  u.Email.String(),
-		Role:   u.Role,
+		Role:   u.Role.String(),
 	}
 }

@@ -168,7 +168,9 @@ func toUserView(u *model.User) dto.UserView {
 		Patronymic:  u.Patronymic,
 		Email:       u.Email.String(),
 		PhoneNumber: u.Phone.String(),
-		Status:      u.Status,
+		Role:        u.Role.String(),
+		Status:      u.Status.String(),
+		LastLoginAt: u.LastLoginAt,
 		CreatedAt:   u.CreatedAt,
 		UpdatedAt:   u.UpdatedAt,
 	}

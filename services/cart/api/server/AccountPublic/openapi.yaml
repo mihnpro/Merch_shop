@@ -1,0 +1,221 @@
+openapi: 3.0.3
+info:
+  title: Cart Service — Public API
+  description: >-
+    Публичные HTTP-эндпоинты cart-сервиса, доступные клиентам через gateway.
+    Все методы требуют аутентификации; user_id берётся из JWT (gateway пробрасывает
+    его в межсервисный gRPC-вызов). Приватный межсервисный контракт описан
+    в ../AccountInternal/cart.proto.
+  version: 1.0.0
+
+servers:
+  - url: /api/v1
+    description: Базовый префикс (gateway проксирует по нему в cart-сервис)
+
+tags:
+  - name: cart
+    description: Корзина текущего пользователя
+
+paths:
+  /cart:
+    get:
+      tags: [cart]
+      summary: Получить корзину текущего пользователя
+      description: >-
+        Возвращает все позиции корзины с подсчитанными суммами строк и итогом.
+        Для пользователя без корзины возвращается пустой список (не 404).
+      responses:
+        "200":
+          description: Содержимое корзины
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CartView"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+    delete:
+      tags: [cart]
+      summary: Очистить корзину
+      description: Удаляет все позиции корзины. Идемпотентно — повтор не ошибка.
+      responses:
+        "204":
+          description: Корзина очищена
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /cart/items:
+    post:
+      tags: [cart]
+      summary: Добавить товар в корзину
+      description: >-
+        Добавляет товар. Если позиция с тем же product_id уже есть — количество
+        суммируется. Перед записью проверяется наличие на складе (inventory) и
+        активность товара (products).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AddItemRequest"
+      responses:
+        "201":
+          description: Позиция добавлена (или количество увеличено)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CartItem"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+
+  /cart/items/{id}:
+    patch:
+      tags: [cart]
+      summary: Изменить количество позиции
+      description: >-
+        Устанавливает новое количество для позиции. При увеличении проверяется
+        наличие на складе. quantity=0 удаляет позицию.
+      parameters:
+        - $ref: "#/components/parameters/ItemID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateItemRequest"
+      responses:
+        "200":
+          description: Количество обновлено (пустой объект, если позиция удалена при quantity=0)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CartItem"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+
+    delete:
+      tags: [cart]
+      summary: Удалить позицию из корзины
+      description: Удаляет позицию по id. Идемпотентно — повтор не ошибка.
+      parameters:
+        - $ref: "#/components/parameters/ItemID"
+      responses:
+        "204":
+          description: Позиция удалена
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    ItemID:
+      name: id
+      in: path
+      required: true
+      description: Идентификатор позиции корзины
+      schema: { type: string, format: uuid }
+
+  responses:
+    BadRequest:
+      description: Некорректный запрос / ошибка валидации
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    Unauthorized:
+      description: Отсутствует или невалиден токен
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    NotFound:
+      description: Товар или позиция не найдены
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    Conflict:
+      description: Недостаточно товара на складе или товар неактивен
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+
+  schemas:
+    AddItemRequest:
+      type: object
+      required: [product_id, quantity]
+      properties:
+        product_id: { type: string, format: uuid }
+        quantity:
+          type: integer
+          format: int32
+          minimum: 1
+          description: Количество для добавления (суммируется с существующим)
+
+    UpdateItemRequest:
+      type: object
+      required: [quantity]
+      properties:
+        quantity:
+          type: integer
+          format: int32
+          minimum: 0
+          description: Новое количество; 0 — удалить позицию
+
+    CartItem:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        product_id: { type: string, format: uuid }
+        product_name:
+          type: string
+          description: Название товара на момент добавления (снимок)
+        quantity: { type: integer, format: int32 }
+        price_per_unit:
+          type: integer
+          format: int32
+          description: Цена за единицу в баллах на момент добавления (снимок)
+        line_total:
+          type: integer
+          format: int32
+          description: Сумма строки (quantity × price_per_unit)
+
+    CartView:
+      type: object
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/CartItem" }
+        total:
+          type: integer
+          format: int32
+          description: Итоговая сумма корзины в баллах
+        item_count:
+          type: integer
+          format: int32
+          description: Количество позиций (строк) в корзине
+
+    Error:
+      type: object
+      properties:
+        code: { type: string }
+        message: { type: string }
+
+security:
+  - bearerAuth: []

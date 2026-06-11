@@ -8,10 +8,12 @@ import (
 
 type Server struct {
 	auth    service.AuthService
+	user    service.UserService
+	admin   service.AdminService
 	log     *zap.Logger
 	cookies CookieConfig
 }
 
-func NewServer(auth service.AuthService, log *zap.Logger, cookies CookieConfig) *Server {
-	return &Server{auth: auth, log: log, cookies: cookies}
+func NewServer(auth service.AuthService, user service.UserService, admin service.AdminService, log *zap.Logger, cookies CookieConfig) *Server {
+	return &Server{auth: auth, user: user, admin: admin, log: log, cookies: cookies}
 }

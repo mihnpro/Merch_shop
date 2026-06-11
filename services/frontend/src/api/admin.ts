@@ -1,7 +1,14 @@
 import { request, uploadFile } from "./client";
 import type {
+  BalanceResponse,
   Category,
   CreateCategoryInput,
+  GrantPointsBody,
+  InventoryAdjustInput,
+  InventoryAdjustResult,
+  ListStockResponse,
+  ListUsersParams,
+  ListUsersResponse,
   Product,
   ProductInput,
   UpdateCategoryInput,
@@ -41,6 +48,35 @@ export function createCategory(body: CreateCategoryInput): Promise<Category> {
 export function updateCategory(id: string, body: UpdateCategoryInput): Promise<Category> {
   return request<Category>(`/admin/categories/${id}`, {
     method: "PUT",
+    body: JSON.stringify(body),
+  });
+}
+
+export function listInventory(): Promise<ListStockResponse> {
+  return request<ListStockResponse>("/admin/inventory", { method: "GET" });
+}
+
+export function adjustInventory(body: InventoryAdjustInput): Promise<InventoryAdjustResult> {
+  return request<InventoryAdjustResult>("/admin/inventory/adjust", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+export function listUsers(params: ListUsersParams = {}): Promise<ListUsersResponse> {
+  const query = new URLSearchParams();
+  if (params.search) query.set("search", params.search);
+  if (params.role) query.set("role", params.role);
+  if (params.status) query.set("status", params.status);
+  if (params.page_size) query.set("page_size", String(params.page_size));
+  if (params.page_token) query.set("page_token", params.page_token);
+  const qs = query.toString();
+  return request<ListUsersResponse>(`/admin/users${qs ? `?${qs}` : ""}`, { method: "GET" });
+}
+
+export function grantPoints(userId: string, body: GrantPointsBody): Promise<BalanceResponse> {
+  return request<BalanceResponse>(`/admin/users/${userId}/grant-points`, {
+    method: "POST",
     body: JSON.stringify(body),
   });
 }

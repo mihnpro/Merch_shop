@@ -4,12 +4,19 @@ import NavBar from "../components/NavBar";
 import { getProduct } from "../api/catalog";
 import type { Product } from "../api/types";
 import { photoUrl } from "../lib/media";
+import { useCart } from "../lib/CartContext";
 
 export default function ProductDetailPage() {
   const { id } = useParams<{ id: string }>();
   const [product, setProduct] = useState<Product | null>(null);
   const [active, setActive] = useState(0);
   const [error, setError] = useState("");
+
+  const { addItem } = useCart();
+  const [qty, setQty] = useState(1);
+  const [addBusy, setAddBusy] = useState(false);
+  const [addSuccess, setAddSuccess] = useState(false);
+  const [addError, setAddError] = useState("");
 
   useEffect(() => {
     if (!id) return;
@@ -20,6 +27,22 @@ export default function ProductDetailPage() {
       })
       .catch((err) => setError(err instanceof Error ? err.message : "Ошибка"));
   }, [id]);
+
+  async function handleAddToCart() {
+    if (!product || addBusy) return;
+    setAddBusy(true);
+    setAddSuccess(false);
+    setAddError("");
+    try {
+      await addItem(product.id, qty);
+      setAddSuccess(true);
+      setTimeout(() => setAddSuccess(false), 3000);
+    } catch (e) {
+      setAddError(e instanceof Error ? e.message : "Ошибка");
+    } finally {
+      setAddBusy(false);
+    }
+  }
 
   return (
     <div className="page">
@@ -64,6 +87,27 @@ export default function ProductDetailPage() {
             <p className="price">{product.price_points} баллов</p>
             <p className="desc">{product.description}</p>
             {!product.active && <p className="muted">Товар скрыт из каталога</p>}
+            {product.active && (
+              <div className="add-to-cart">
+                <label>
+                  Количество
+                  <input
+                    type="number"
+                    min={1}
+                    max={99}
+                    value={qty}
+                    onChange={(e) =>
+                      setQty(Math.max(1, Math.min(99, parseInt(e.target.value) || 1)))
+                    }
+                  />
+                </label>
+                <button type="button" onClick={handleAddToCart} disabled={addBusy}>
+                  {addBusy ? "Добавляем…" : "В корзину"}
+                </button>
+                {addSuccess && <p className="info">Добавлено в корзину!</p>}
+                {addError && <p className="error">{addError}</p>}
+              </div>
+            )}
           </div>
         </div>
       )}
