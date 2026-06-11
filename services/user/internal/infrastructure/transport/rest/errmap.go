@@ -43,8 +43,16 @@ func mapError(err error) (int, apiError) {
 		errors.Is(err, domain.ErrEmptyFirstName),
 		errors.Is(err, domain.ErrEmptyLastName),
 		errors.Is(err, domain.ErrInvalidEmailFormat),
-		errors.Is(err, domain.ErrInvalidPhoneFormat):
+		errors.Is(err, domain.ErrInvalidPhoneFormat),
+		errors.Is(err, domain.ErrInvalidRole),
+		errors.Is(err, domain.ErrInvalidStatus):
 		return http.StatusBadRequest, apiError{Code: "INVALID_ARGUMENT", Message: err.Error()}
+	case errors.Is(err, domain.ErrInsufficientBalance):
+		return http.StatusUnprocessableEntity, apiError{Code: "INSUFFICIENT_BALANCE", Message: "insufficient points balance"}
+	case errors.Is(err, domain.ErrOperationAlreadyDone):
+		return http.StatusConflict, apiError{Code: "ALREADY_PROCESSED", Message: "operation already processed"}
+	case errors.Is(err, domain.ErrUserBlocked):
+		return http.StatusForbidden, apiError{Code: "USER_BLOCKED", Message: "user is blocked"}
 	default:
 		return http.StatusInternalServerError, apiError{Code: "INTERNAL", Message: "internal server error"}
 	}

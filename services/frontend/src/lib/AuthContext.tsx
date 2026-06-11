@@ -7,12 +7,13 @@ import {
   type ReactNode,
 } from "react";
 import { getMe } from "../api/auth";
+import type { Role } from "../api/types";
 
 type AuthStatus = "loading" | "authenticated" | "anonymous";
 
 interface AuthState {
   status: AuthStatus;
-  role: string | null;
+  role: Role | null;
   userId: string | null;
 }
 

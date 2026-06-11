@@ -9,6 +9,7 @@ import (
 
 	"github.com/mihnpro/Merch_shop/services/user_customer/internal/domain"
 	"github.com/mihnpro/Merch_shop/services/user_customer/internal/domain/model"
+	"github.com/mihnpro/Merch_shop/services/user_customer/internal/domain/repository"
 	vo "github.com/mihnpro/Merch_shop/services/user_customer/internal/domain/valueobject"
 )
 
@@ -37,6 +38,26 @@ func (m *mockUserRepo) CreateUser(ctx context.Context, u *model.User) (uuid.UUID
 func (m *mockUserRepo) ExistsByLogin(ctx context.Context, login vo.Login) (bool, error) {
 	_, ok := m.users[login.String()]
 	return ok, nil
+}
+
+func (m *mockUserRepo) GetUserByID(ctx context.Context, id uuid.UUID) (*model.User, error) {
+	return nil, domain.ErrUserNotFound
+}
+
+func (m *mockUserRepo) UpdateUserStatus(ctx context.Context, id uuid.UUID, status vo.Status) (*model.User, error) {
+	return nil, domain.ErrUserNotFound
+}
+
+func (m *mockUserRepo) UpdateUserRole(ctx context.Context, id uuid.UUID, role vo.Role) (*model.User, error) {
+	return nil, domain.ErrUserNotFound
+}
+
+func (m *mockUserRepo) UpdatePassword(ctx context.Context, id uuid.UUID, hash vo.PasswordHash) error {
+	return nil
+}
+
+func (m *mockUserRepo) ListUsers(ctx context.Context, f repository.ListUsersFilter) ([]*model.User, string, error) {
+	return nil, "", nil
 }
 
 func TestAuthReadService_GetUserByLogin(t *testing.T) {

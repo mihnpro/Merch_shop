@@ -2,8 +2,9 @@ import { useState } from "react";
 import NavBar from "../components/NavBar";
 import ProductsPanel from "./admin/ProductsPanel";
 import CategoriesPanel from "./admin/CategoriesPanel";
+import UsersPanel from "./admin/UsersPanel";
 
-type Tab = "products" | "categories";
+type Tab = "products" | "categories" | "users";
 
 export default function AdminPage() {
   const [tab, setTab] = useState<Tab>("products");
@@ -28,9 +29,18 @@ export default function AdminPage() {
         >
           Категории
         </button>
+        <button
+          type="button"
+          className={tab === "users" ? "tab active" : "tab"}
+          onClick={() => setTab("users")}
+        >
+          Пользователи
+        </button>
       </div>
 
-      {tab === "products" ? <ProductsPanel /> : <CategoriesPanel />}
+      {tab === "products" && <ProductsPanel />}
+      {tab === "categories" && <CategoriesPanel />}
+      {tab === "users" && <UsersPanel />}
     </div>
   );
 }

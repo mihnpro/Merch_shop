@@ -8,6 +8,7 @@ import (
 
 	"github.com/mihnpro/Merch_shop/services/user_customer/internal/domain"
 	"github.com/mihnpro/Merch_shop/services/user_customer/internal/domain/model"
+	"github.com/mihnpro/Merch_shop/services/user_customer/internal/domain/repository"
 	vo "github.com/mihnpro/Merch_shop/services/user_customer/internal/domain/valueobject"
 )
 
@@ -34,6 +35,26 @@ func (f *fakeUserRepo) ExistsByLogin(ctx context.Context, login vo.Login) (bool,
 		return false, f.existsErr
 	}
 	return f.existing[login.String()], nil
+}
+
+func (f *fakeUserRepo) GetUserByID(ctx context.Context, id uuid.UUID) (*model.User, error) {
+	return nil, domain.ErrUserNotFound
+}
+
+func (f *fakeUserRepo) UpdateUserStatus(ctx context.Context, id uuid.UUID, status vo.Status) (*model.User, error) {
+	return nil, domain.ErrUserNotFound
+}
+
+func (f *fakeUserRepo) UpdateUserRole(ctx context.Context, id uuid.UUID, role vo.Role) (*model.User, error) {
+	return nil, domain.ErrUserNotFound
+}
+
+func (f *fakeUserRepo) UpdatePassword(ctx context.Context, id uuid.UUID, hash vo.PasswordHash) error {
+	return nil
+}
+
+func (f *fakeUserRepo) ListUsers(ctx context.Context, flt repository.ListUsersFilter) ([]*model.User, string, error) {
+	return nil, "", nil
 }
 
 

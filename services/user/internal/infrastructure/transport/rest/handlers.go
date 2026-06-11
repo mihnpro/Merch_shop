@@ -3,6 +3,7 @@ package rest
 import (
 	"encoding/json"
 	"net/http"
+	"time"
 
 	"github.com/mihnpro/Merch_shop/services/user_customer/internal/app/dto"
 	"github.com/mihnpro/Merch_shop/services/user_customer/internal/domain"
@@ -19,13 +20,18 @@ type registerRequest struct {
 }
 
 type userResponse struct {
-	ID          string `json:"id"`
-	Login       string `json:"login"`
-	FirstName   string `json:"first_name"`
-	LastName    string `json:"last_name"`
-	Patronymic  string `json:"patronymic,omitempty"`
-	Email       string `json:"email"`
-	PhoneNumber string `json:"phone_number,omitempty"`
+	ID          string     `json:"id"`
+	Login       string     `json:"login"`
+	FirstName   string     `json:"first_name"`
+	LastName    string     `json:"last_name"`
+	Patronymic  string     `json:"patronymic,omitempty"`
+	Email       string     `json:"email"`
+	PhoneNumber string     `json:"phone_number,omitempty"`
+	Role        string     `json:"role"`
+	Status      string     `json:"status"`
+	LastLoginAt *time.Time `json:"last_login_at,omitempty"`
+	CreatedAt   *time.Time `json:"created_at,omitempty"`
+	UpdatedAt   *time.Time `json:"updated_at,omitempty"`
 }
 
 type loginRequest struct {
@@ -123,7 +129,7 @@ func (s *Server) Me(w http.ResponseWriter, r *http.Request) {
 }
 
 func toUserResponse(v dto.UserView) userResponse {
-	return userResponse{
+	resp := userResponse{
 		ID:          v.ID,
 		Login:       v.Login,
 		FirstName:   v.FirstName,
@@ -131,5 +137,15 @@ func toUserResponse(v dto.UserView) userResponse {
 		Patronymic:  v.Patronymic,
 		Email:       v.Email,
 		PhoneNumber: v.PhoneNumber,
+		Role:        v.Role,
+		Status:      v.Status,
+		LastLoginAt: v.LastLoginAt,
 	}
+	if !v.CreatedAt.IsZero() {
+		resp.CreatedAt = &v.CreatedAt
+	}
+	if !v.UpdatedAt.IsZero() {
+		resp.UpdatedAt = &v.UpdatedAt
+	}
+	return resp
 }

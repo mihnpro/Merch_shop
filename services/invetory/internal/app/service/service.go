@@ -4,8 +4,10 @@ import (
 	"context"
 
 	"github.com/google/uuid"
+	"go.uber.org/zap"
 
 	"github.com/mihnpro/Merch_shop/services/invetory/internal/app/dto"
+	"github.com/mihnpro/Merch_shop/services/invetory/internal/app/port"
 	"github.com/mihnpro/Merch_shop/services/invetory/internal/domain"
 	"github.com/mihnpro/Merch_shop/services/invetory/internal/domain/repository"
 	domainsvc "github.com/mihnpro/Merch_shop/services/invetory/internal/domain/service"
@@ -15,22 +17,38 @@ type InventoryService interface {
 	ReserveStock(ctx context.Context, in dto.ReserveStockInput) (dto.ReservationView, error)
 	ReleaseReserve(ctx context.Context, in dto.ReleaseReserveInput) (dto.ReservationView, error)
 	AdjustStock(ctx context.Context, in dto.AdjustStockInput) (dto.StockView, error)
+	HandleOrderCreated(ctx context.Context, in dto.ReserveStockInput) error
 }
 
 type inventoryService struct {
 	stock              repository.StockRepository
 	reservations       repository.ReservationRepository
+	orders             port.OrderNotifier
+	logger             *zap.Logger
 	stockFactory       *domainsvc.StockFactory
 	reservationFactory *domainsvc.ReservationFactory
 }
 
-func NewInventoryService(stock repository.StockRepository, reservations repository.ReservationRepository) InventoryService {
+func NewInventoryService(stock repository.StockRepository, reservations repository.ReservationRepository, orders port.OrderNotifier, logger *zap.Logger) InventoryService {
 	return &inventoryService{
 		stock:              stock,
 		reservations:       reservations,
+		orders:             orders,
+		logger:             logger,
 		stockFactory:       domainsvc.NewStockFactory(),
 		reservationFactory: domainsvc.NewReservationFactory(),
 	}
+}
+
+func (s *inventoryService) HandleOrderCreated(ctx context.Context, in dto.ReserveStockInput) error {
+	if _, err := s.ReserveStock(ctx, in); err != nil {
+		s.logger.Warn("reserve failed, cancelling order",
+			zap.String("order_id", in.OrderID),
+			zap.Error(err),
+		)
+		return s.orders.UpdateOrderStatus(ctx, in.OrderID, "cancelled", "insufficient stock")
+	}
+	return s.orders.UpdateOrderStatus(ctx, in.OrderID, "confirmed", "stock reserved")
 }
 
 

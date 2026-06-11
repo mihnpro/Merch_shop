@@ -19,6 +19,7 @@ import (
 	userpb "github.com/mihnpro/Merch_shop/services/user_customer/api/server/AccountInternal"
 	"github.com/mihnpro/Merch_shop/services/user_customer/internal/app/query"
 	"github.com/mihnpro/Merch_shop/services/user_customer/internal/app/service"
+	domainsvc "github.com/mihnpro/Merch_shop/services/user_customer/internal/domain/service"
 	"github.com/mihnpro/Merch_shop/services/user_customer/internal/infrastructure/account"
 	"github.com/mihnpro/Merch_shop/services/user_customer/internal/infrastructure/persistence"
 	psqlrepo "github.com/mihnpro/Merch_shop/services/user_customer/internal/infrastructure/repository/psql"
@@ -70,6 +71,7 @@ func main() {
 	defer redisClient.Close()
 
 	userRepo := psqlrepo.NewUserRepository(db)
+	balanceRepo := psqlrepo.NewBalanceRepository(db)
 	tokenStore := redisrepo.NewTokenStore(redisClient, logger)
 	acct := account.NewAccount(
 		os.Getenv("JWT_ACCESS_SECRET"),
@@ -78,10 +80,14 @@ func main() {
 		refreshTokenTTL,
 	)
 
-	readSvc := query.NewAuthReadService(userRepo)
-	querySvc := service.NewAuthService(userRepo, readSvc, acct, tokenStore, refreshTokenTTL)
+	pointsMgr := domainsvc.NewPointsManager(balanceRepo)
 
-	grpcSrv := grpctransport.NewGRPCServer(querySvc)
+	readSvc := query.NewAuthReadService(userRepo)
+	authSvc := service.NewAuthService(userRepo, readSvc, acct, tokenStore, refreshTokenTTL)
+	userSvc := service.NewUserService(userRepo, balanceRepo, pointsMgr, acct)
+	adminSvc := service.NewAdminService(userRepo, balanceRepo, pointsMgr, acct)
+
+	grpcSrv := grpctransport.NewGRPCServer(authSvc, userSvc, adminSvc)
 
 	grpcPort := getEnv("GRPC_PORT", "50051")
 	lis, err := net.Listen("tcp", fmt.Sprintf(":%s", grpcPort))
@@ -103,9 +109,9 @@ func main() {
 
 	httpPort := getEnv("HTTP_PORT", "8081")
 	httpSrv := &http.Server{
-		Addr:    fmt.Sprintf(":%s", httpPort),
+		Addr: fmt.Sprintf(":%s", httpPort),
 		Handler: resttransport.NewRouter(
-			resttransport.NewServer(querySvc, logger, cookieCfg),
+			resttransport.NewServer(authSvc, userSvc, adminSvc, logger, cookieCfg),
 			resttransport.NewMiddleware(acct),
 		),
 	}

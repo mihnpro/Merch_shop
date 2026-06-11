@@ -1,5 +1,6 @@
 import { request } from "./client";
 import type {
+  BalanceResponse,
   LoginBody,
   LoginResponse,
   MeResponse,
@@ -27,4 +28,8 @@ export function logout(): Promise<void> {
 
 export function getMe(): Promise<MeResponse> {
   return request<MeResponse>("/me", { method: "GET" });
+}
+
+export function getMyBalance(): Promise<BalanceResponse> {
+  return request<BalanceResponse>("/me/balance", { method: "GET" });
 }

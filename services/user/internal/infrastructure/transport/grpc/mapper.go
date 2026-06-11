@@ -30,7 +30,7 @@ func toLoginInput(req *userpb.LoginRequest) dto.LoginInput {
 }
 
 func toUserProto(v dto.UserView) *userpb.User {
-	return &userpb.User{
+	u := &userpb.User{
 		Id:          v.ID,
 		Login:       v.Login,
 		FirstName:   v.FirstName,
@@ -38,9 +38,15 @@ func toUserProto(v dto.UserView) *userpb.User {
 		Patronymic:  v.Patronymic,
 		Email:       v.Email,
 		PhoneNumber: v.PhoneNumber,
+		Role:        v.Role,
+		Status:      toUserStatusEnum(v.Status),
 		CreatedAt:   toTimestamp(v.CreatedAt),
 		UpdatedAt:   toTimestamp(v.UpdatedAt),
 	}
+	if v.LastLoginAt != nil {
+		u.LastLoginAt = toTimestamp(*v.LastLoginAt)
+	}
+	return u
 }
 
 func toTokenPairProto(t port.TokenPair) *userpb.TokenPair {
@@ -49,6 +55,47 @@ func toTokenPairProto(t port.TokenPair) *userpb.TokenPair {
 		RefreshToken:     t.RefreshToken,
 		AccessExpiresAt:  toTimestamp(t.AccessExpiresAt),
 		RefreshExpiresAt: toTimestamp(t.RefreshExpiresAt),
+	}
+}
+
+func toBalanceProto(b dto.BalanceView) *userpb.Balance {
+	return &userpb.Balance{
+		Points:    b.Points,
+		UpdatedAt: toTimestamp(b.UpdatedAt),
+	}
+}
+
+func toTransactionProto(t dto.TransactionView) *userpb.PointsTransaction {
+	return &userpb.PointsTransaction{
+		Id:          t.ID,
+		UserId:      t.UserID,
+		OperationId: t.OperationID,
+		OrderId:     t.OrderID,
+		Amount:      t.Amount,
+		Reason:      t.Reason,
+		CreatedAt:   toTimestamp(t.CreatedAt),
+	}
+}
+
+func toUserStatusEnum(status string) userpb.UserStatus {
+	switch status {
+	case "blocked":
+		return userpb.UserStatus_USER_STATUS_BLOCKED
+	case "active":
+		return userpb.UserStatus_USER_STATUS_ACTIVE
+	default:
+		return userpb.UserStatus_USER_STATUS_UNSPECIFIED
+	}
+}
+
+func toUserStatusString(s userpb.UserStatus) string {
+	switch s {
+	case userpb.UserStatus_USER_STATUS_ACTIVE:
+		return "active"
+	case userpb.UserStatus_USER_STATUS_BLOCKED:
+		return "blocked"
+	default:
+		return ""
 	}
 }
 
