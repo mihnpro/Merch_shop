@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -19,6 +20,8 @@ import (
 	"github.com/mihnpro/Merch_shop/services/invetory/internal/app/query"
 	"github.com/mihnpro/Merch_shop/services/invetory/internal/app/service"
 	"github.com/mihnpro/Merch_shop/services/invetory/internal/infrastructure/account"
+	"github.com/mihnpro/Merch_shop/services/invetory/internal/infrastructure/clients"
+	kafkainfra "github.com/mihnpro/Merch_shop/services/invetory/internal/infrastructure/kafka"
 	"github.com/mihnpro/Merch_shop/services/invetory/internal/infrastructure/persistence"
 	psqlrepo "github.com/mihnpro/Merch_shop/services/invetory/internal/infrastructure/repository/psql"
 	grpctransport "github.com/mihnpro/Merch_shop/services/invetory/internal/infrastructure/transport/grpc"
@@ -33,7 +36,8 @@ func main() {
 		logger.Info("no .env file loaded", zap.Error(err))
 	}
 
-	ctx := context.Background()
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
 
 	db, err := persistence.NewPostgres(ctx, persistence.PostgresConfig{
 		URL:      os.Getenv("DATABASE_URL"),
@@ -52,9 +56,18 @@ func main() {
 	stockRepo := psqlrepo.NewStockRepository(db)
 	reservationRepo := psqlrepo.NewReservationRepository(db)
 
-	writeSvc := service.NewInventoryService(stockRepo, reservationRepo)
+	orderClient, err := clients.NewOrderClient(getEnv("ORDER_SERVICE_ADDR", "order:50056"))
+	if err != nil {
+		logger.Fatal("order client", zap.Error(err))
+	}
+
+	writeSvc := service.NewInventoryService(stockRepo, reservationRepo, orderClient, logger)
 	readSvc := query.NewInventoryReadService(stockRepo)
 	validator := account.NewValidator(os.Getenv("JWT_ACCESS_SECRET"))
+
+	brokers := strings.Split(getEnv("KAFKA_BROKERS", "kafka:9092"), ",")
+	consumer := kafkainfra.NewConsumer(brokers, writeSvc, logger)
+	go consumer.Run(ctx)
 
 	grpcSrv := grpctransport.NewGRPCServer(writeSvc, readSvc)
 	grpcPort := getEnv("GRPC_PORT", "50051")
@@ -91,9 +104,7 @@ func main() {
 		}
 	}()
 
-	quit := make(chan os.Signal, 1)
-	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
-	<-quit
+	<-ctx.Done()
 
 	logger.Info("shutting down servers")
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
