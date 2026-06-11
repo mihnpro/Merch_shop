@@ -1,3 +1,7 @@
+// ─── User service (api/server/AccountPublic/openapi.yaml) ──────────────────────
+
+export type Role = "user" | "admin";
+
 export interface User {
   id: string;
   login: string;
@@ -29,8 +33,10 @@ export interface LoginResponse {
 
 export interface MeResponse {
   user_id: string;
-  role: string;
+  role: Role;
 }
+
+// ─── Product / Catalog service ─────────────────────────────────────────────────
 
 export interface Category {
   id: string;
@@ -119,4 +125,99 @@ export interface StockItem {
 
 export interface ListStockResponse {
   items: StockItem[];
+}
+
+export interface CartItem {
+  id: string;
+  product_id: string;
+  product_name: string;
+  quantity: number;
+  price_per_unit: number;
+  line_total: number;
+}
+
+export interface CartView {
+  items: CartItem[];
+  total: number;
+  item_count: number;
+}
+
+// ─── Order service ─────────────────────────────────────────────────────────────
+
+export type OrderStatus =
+  | "pending"
+  | "confirmed"
+  | "ready_to_pickup"
+  | "delivered"
+  | "cancelled";
+
+export interface OrderItemView {
+  id: string;
+  product_id: string;
+  product_name: string;
+  quantity: number;
+  price_points: number;
+}
+
+export interface OrderView {
+  id: string;
+  user_id: string;
+  status: OrderStatus;
+  total_points: number;
+  delivery_address: string;
+  items: OrderItemView[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ListOrdersResponse {
+  orders: OrderView[];
+  next_page_token?: string;
+}
+
+export interface ListOrdersParams {
+  status?: string;
+  page_size?: number;
+  page_token?: string;
+}
+
+// ─── Admin: users / points ─────────────────────────────────────────────────────
+
+export interface AdminUser {
+  id: string;
+  login: string;
+  first_name: string;
+  last_name: string;
+  patronymic?: string;
+  email: string;
+  phone_number?: string;
+  role: Role;
+  status: string;
+  last_login_at?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface ListUsersResponse {
+  users: AdminUser[];
+  next_page_token?: string;
+}
+
+export interface ListUsersParams {
+  search?: string;
+  role?: string;
+  status?: string;
+  page_size?: number;
+  page_token?: string;
+}
+
+export interface GrantPointsBody {
+  amount: number;
+  operation_id: string;
+  reason: string;
+}
+
+export interface BalanceResponse {
+  points: number;
+  updated_at: string;
 }
