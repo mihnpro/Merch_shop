@@ -3,6 +3,8 @@ services:
   product: http://product:8082
   media: http://media:8083
   inventory: http://inventory:8084
+  cart: http://cart:8085
+  order: http://order:8086
 
 routes:
   - prefix: /api/v1/auth/*
@@ -29,3 +31,15 @@ routes:
 
   - prefix: /api/v1/admin/inventory
     service: inventory
+
+  - prefix: /api/v1/cart
+    service: cart
+
+  - prefix: /api/v1/orders
+    service: order
+
+  - prefix: /api/v1/admin/orders
+    service: order
+
+  - prefix: /api/v1/admin/users
+    service: user
