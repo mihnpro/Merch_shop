@@ -1,0 +1,287 @@
+openapi: 3.0.3
+info:
+  title: Order Service — Public API
+  description: >-
+    Публичные HTTP-эндпоинты order-сервиса, доступные клиентам через gateway.
+
+    Аутентификация — на HttpOnly-куке `access_token`, выдаваемой user-сервисом.
+    Gateway извлекает её и проставляет бэкенду заголовок
+    `Authorization: Bearer <token>` (поэтому допустим и прямой вызов с
+    Bearer-заголовком). Эндпоинты `/admin/*` требуют `role=admin`.
+
+    Оформление заказа берёт товары и сумму из корзины пользователя на стороне
+    сервера (тело запроса содержит только адрес доставки), синхронно списывает
+    баллы и создаёт заказ в статусе `pending`. Подтверждение/отмена по резерву
+    склада приходят асинхронно (Kafka-сага), поэтому статус заказа меняется уже
+    после ответа на создание.
+
+    Приватные межсервисные методы описаны gRPC-контрактом в
+    ../AccountInternal/order.proto.
+  version: 1.0.0
+
+servers:
+  - url: /api/v1
+    description: Базовый префикс (gateway проксирует по нему в order-сервис)
+
+tags:
+  - name: orders
+    description: Оформление и просмотр заказов текущего пользователя
+  - name: admin
+    description: Управление заказами (только role=admin)
+
+paths:
+  /orders:
+    post:
+      tags: [orders]
+      summary: Оформить заказ из корзины
+      description: >-
+        Собирает заказ из текущей корзины пользователя, проверяет баланс баллов,
+        списывает сумму и сохраняет заказ в статусе `pending`. Корзина при успехе
+        очищается.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateOrderRequest"
+      responses:
+        "201":
+          description: Заказ создан (статус `pending`)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Order"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "402":
+          description: Недостаточно баллов на балансе
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "409":
+          description: Корзина пуста
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+    get:
+      tags: [orders]
+      summary: Список заказов текущего пользователя
+      parameters:
+        - $ref: "#/components/parameters/StatusFilter"
+        - $ref: "#/components/parameters/PageSize"
+        - $ref: "#/components/parameters/PageToken"
+      responses:
+        "200":
+          description: Страница заказов
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrdersResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /orders/{id}:
+    get:
+      tags: [orders]
+      summary: Заказ по идентификатору
+      description: >-
+        Пользователь может получить только свой заказ; администратор — любой.
+      parameters:
+        - $ref: "#/components/parameters/OrderId"
+      responses:
+        "200":
+          description: Заказ
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Order"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /admin/orders:
+    get:
+      tags: [admin]
+      summary: Список всех заказов с фильтрами и пагинацией по токену
+      parameters:
+        - { name: user_id, in: query, schema: { type: string, format: uuid }, description: Фильтр по пользователю }
+        - $ref: "#/components/parameters/StatusFilter"
+        - $ref: "#/components/parameters/PageSize"
+        - $ref: "#/components/parameters/PageToken"
+      responses:
+        "200":
+          description: Страница заказов
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrdersResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /admin/orders/{id}/status:
+    put:
+      tags: [admin]
+      summary: Сменить статус заказа
+      description: >-
+        Переход проверяется конечным автоматом статусов:
+        `pending → confirmed | cancelled`, `confirmed → ready_to_pickup |
+        cancelled`, `ready_to_pickup → delivered`. При переходе в `cancelled`
+        баллы возвращаются пользователю, а резерв склада освобождается.
+      parameters:
+        - $ref: "#/components/parameters/OrderId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateStatusRequest"
+      responses:
+        "200":
+          description: Обновлённый заказ
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Order"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          description: Недопустимый переход статуса
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: access_token
+
+  parameters:
+    OrderId:
+      name: id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    StatusFilter:
+      name: status
+      in: query
+      schema: { $ref: "#/components/schemas/OrderStatus" }
+      description: Фильтр по статусу заказа
+    PageSize:
+      name: page_size
+      in: query
+      schema: { type: integer, default: 20, minimum: 1, maximum: 100 }
+    PageToken:
+      name: page_token
+      in: query
+      schema: { type: string }
+      description: Токен следующей страницы; пусто, если страница последняя
+
+  responses:
+    BadRequest:
+      description: Некорректный запрос / ошибка валидации
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    Unauthorized:
+      description: Отсутствует или невалиден токен/сессия
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    Forbidden:
+      description: Недостаточно прав (требуется role=admin или владение заказом)
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    NotFound:
+      description: Заказ не найден
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+
+  schemas:
+    OrderStatus:
+      type: string
+      enum: [pending, confirmed, ready_to_pickup, delivered, cancelled]
+
+    OrderItem:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        product_id: { type: string, format: uuid }
+        product_name: { type: string }
+        quantity: { type: integer }
+        price_points:
+          type: integer
+          format: int64
+          description: Цена за единицу в баллах на момент оформления
+
+    Order:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        user_id: { type: string, format: uuid }
+        status: { $ref: "#/components/schemas/OrderStatus" }
+        total_points:
+          type: integer
+          format: int64
+          description: Итоговая сумма заказа в баллах
+        delivery_address: { type: string }
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/OrderItem" }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    CreateOrderRequest:
+      type: object
+      required: [delivery_address]
+      properties:
+        delivery_address:
+          type: string
+          minLength: 1
+          description: >-
+            Адрес доставки. Состав и сумма заказа берутся из корзины на сервере.
+
+    UpdateStatusRequest:
+      type: object
+      required: [status]
+      properties:
+        status: { $ref: "#/components/schemas/OrderStatus" }
+        reason:
+          type: string
+          description: Причина (например, при отмене); попадает в компенсацию
+
+    OrdersResponse:
+      type: object
+      properties:
+        orders:
+          type: array
+          items: { $ref: "#/components/schemas/Order" }
+        next_page_token:
+          type: string
+          description: Токен следующей страницы; пусто, если страница последняя
+
+    Error:
+      type: object
+      properties:
+        code: { type: string }
+        message: { type: string }
+
+security:
+  - cookieAuth: []
