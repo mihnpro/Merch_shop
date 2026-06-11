@@ -1,4 +1,3 @@
-// ─── User service (api/server/AccountPublic/openapi.yaml) ──────────────────────
 
 export type Role = "user" | "admin";
 
@@ -35,8 +34,6 @@ export interface MeResponse {
   user_id: string;
   role: Role;
 }
-
-// ─── Product / Catalog service ─────────────────────────────────────────────────
 
 export interface Category {
   id: string;
@@ -142,7 +139,6 @@ export interface CartView {
   item_count: number;
 }
 
-// ─── Order service ─────────────────────────────────────────────────────────────
 
 export type OrderStatus =
   | "pending"
@@ -181,7 +177,6 @@ export interface ListOrdersParams {
   page_token?: string;
 }
 
-// ─── Admin: users / points ─────────────────────────────────────────────────────
 
 export interface AdminUser {
   id: string;
