@@ -35,6 +35,18 @@ func NewGRPCError(err error) error {
 		return status.Error(codes.InvalidArgument, "invalid email format")
 	case errors.Is(err, domain.ErrInvalidPhoneFormat):
 		return status.Error(codes.InvalidArgument, "invalid phone number format")
+	case errors.Is(err, domain.ErrForbidden):
+		return status.Error(codes.PermissionDenied, "permission denied")
+	case errors.Is(err, domain.ErrInsufficientBalance):
+		return status.Error(codes.FailedPrecondition, "insufficient points balance")
+	case errors.Is(err, domain.ErrOperationAlreadyDone):
+		return status.Error(codes.AlreadyExists, "operation already processed")
+	case errors.Is(err, domain.ErrUserBlocked):
+		return status.Error(codes.PermissionDenied, "user is blocked")
+	case errors.Is(err, domain.ErrInvalidRole):
+		return status.Error(codes.InvalidArgument, "invalid role")
+	case errors.Is(err, domain.ErrInvalidStatus):
+		return status.Error(codes.InvalidArgument, "invalid status")
 	default:
 		return status.Error(codes.Internal, "internal server error")
 	}
