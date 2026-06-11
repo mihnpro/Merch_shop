@@ -3,7 +3,15 @@ info:
   title: User Service — Public API
   description: >-
     Публичные HTTP-эндпоинты user-сервиса, доступные клиентам через gateway.
-    Приватные межсервисные методы описаны gRPC-контрактом в ../AccountInternal/users.proto.
+
+    Аутентификация — на HttpOnly-куках: `/auth/login` и `/auth/refresh` выдают
+    `access_token` и `refresh_token` через заголовок `Set-Cookie`, токены в теле
+    ответа не возвращаются. Gateway извлекает cookie `access_token` и проставляет
+    бэкендам заголовок `Authorization: Bearer <token>` (поэтому допустим и прямой
+    вызов с Bearer-заголовком). `refresh_token` ограничен путём `/api/v1/auth`.
+
+    Приватные межсервисные методы описаны gRPC-контрактом в
+    ../AccountInternal/users.proto.
   version: 1.0.0
 
 servers:
@@ -14,7 +22,9 @@ tags:
   - name: auth
     description: Регистрация и управление сессией
   - name: profile
-    description: Данные текущего пользователя
+    description: Данные и баланс текущего пользователя
+  - name: admin
+    description: Управление пользователями и баллами (только role=admin)
 
 paths:
   /auth/register:
@@ -47,7 +57,10 @@ paths:
   /auth/login:
     post:
       tags: [auth]
-      summary: Вход (выдаёт пару токенов)
+      summary: Вход (выставляет cookie-сессию)
+      description: >-
+        При успехе выставляет HttpOnly-куки `access_token` и `refresh_token`
+        через `Set-Cookie`. Тело ответа содержит только профиль пользователя.
       security: []
       requestBody:
         required: true
@@ -58,6 +71,12 @@ paths:
       responses:
         "200":
           description: Успешный вход
+          headers:
+            Set-Cookie:
+              description: >-
+                Две куки: `access_token` (path=/) и `refresh_token`
+                (path=/api/v1/auth), обе HttpOnly.
+              schema: { type: string }
           content:
             application/json:
               schema:
@@ -70,43 +89,32 @@ paths:
   /auth/refresh:
     post:
       tags: [auth]
-      summary: Обновление пары токенов по refresh-токену
+      summary: Обновление пары токенов по refresh-куке
+      description: >-
+        Читает `refresh_token` из куки (тело запроса не требуется), ротирует
+        пару токенов и выставляет новые куки через `Set-Cookie`.
       security: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/RefreshRequest"
       responses:
-        "200":
-          description: Новая пара токенов
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Tokens"
-        "400":
-          $ref: "#/components/responses/BadRequest"
+        "204":
+          description: Куки обновлены (тело пустое)
+          headers:
+            Set-Cookie:
+              description: Новые `access_token` и `refresh_token`.
+              schema: { type: string }
         "401":
           $ref: "#/components/responses/Unauthorized"
 
   /auth/logout:
     post:
       tags: [auth]
-      summary: Отзыв refresh-токена
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/LogoutRequest"
+      summary: Завершение сессии
+      description: >-
+        Отзывает `refresh_token` (если кука присутствует) и очищает обе
+        auth-куки. Идемпотентно: вызывается без активной сессии.
+      security: []
       responses:
         "204":
-          description: Сессия завершена
-        "400":
-          $ref: "#/components/responses/BadRequest"
-        "401":
-          $ref: "#/components/responses/Unauthorized"
+          description: Сессия завершена, куки очищены
 
   /me:
     get:
@@ -122,28 +130,264 @@ paths:
         "401":
           $ref: "#/components/responses/Unauthorized"
 
+  /me/balance:
+    get:
+      tags: [profile]
+      summary: Баланс баллов текущего пользователя
+      responses:
+        "200":
+          description: Текущий баланс
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Balance"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /me/transactions:
+    get:
+      tags: [profile]
+      summary: История операций по баллам текущего пользователя
+      parameters:
+        - $ref: "#/components/parameters/PageSize"
+        - $ref: "#/components/parameters/PageToken"
+      responses:
+        "200":
+          description: Страница транзакций
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TransactionsResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /admin/users:
+    get:
+      tags: [admin]
+      summary: Список пользователей с фильтрами и пагинацией по токену
+      parameters:
+        - { name: search, in: query, schema: { type: string }, description: Поиск по логину/email/имени/фамилии }
+        - { name: role, in: query, schema: { $ref: "#/components/schemas/Role" }, description: Фильтр по роли }
+        - { name: status, in: query, schema: { $ref: "#/components/schemas/Status" }, description: Фильтр по статусу }
+        - $ref: "#/components/parameters/PageSize"
+        - $ref: "#/components/parameters/PageToken"
+      responses:
+        "200":
+          description: Страница пользователей
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListUsersResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /admin/users/{id}:
+    get:
+      tags: [admin]
+      summary: Карточка пользователя по идентификатору
+      parameters:
+        - $ref: "#/components/parameters/UserId"
+      responses:
+        "200":
+          description: Пользователь
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /admin/users/{id}/grant-points:
+    post:
+      tags: [admin]
+      summary: Начислить баллы пользователю
+      description: >-
+        Идемпотентно по `operation_id`: повторный запрос с тем же ключом
+        вернёт текущий баланс, не начисляя повторно.
+      parameters:
+        - $ref: "#/components/parameters/UserId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GrantPointsRequest"
+      responses:
+        "200":
+          description: Обновлённый баланс
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Balance"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /admin/users/{id}/reset-password:
+    post:
+      tags: [admin]
+      summary: Сбросить пароль пользователя
+      description: Генерирует новый пароль и возвращает его одноразово в ответе.
+      parameters:
+        - $ref: "#/components/parameters/UserId"
+      responses:
+        "200":
+          description: Новый пароль
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ResetPasswordResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /admin/users/{id}/status:
+    put:
+      tags: [admin]
+      summary: Заблокировать / разблокировать пользователя
+      parameters:
+        - $ref: "#/components/parameters/UserId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BlockUserRequest"
+      responses:
+        "200":
+          description: Обновлённый пользователь
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /admin/users/{id}/role:
+    put:
+      tags: [admin]
+      summary: Сменить роль пользователя
+      parameters:
+        - $ref: "#/components/parameters/UserId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChangeRoleRequest"
+      responses:
+        "200":
+          description: Обновлённый пользователь
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /admin/users/{id}/transactions:
+    get:
+      tags: [admin]
+      summary: История операций по баллам пользователя
+      parameters:
+        - $ref: "#/components/parameters/UserId"
+        - $ref: "#/components/parameters/PageSize"
+        - $ref: "#/components/parameters/PageToken"
+      responses:
+        "200":
+          description: Страница транзакций
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TransactionsResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
 components:
   securitySchemes:
-    bearerAuth:
-      type: http
-      scheme: bearer
-      bearerFormat: JWT
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: access_token
+
+  parameters:
+    UserId:
+      name: id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    PageSize:
+      name: page_size
+      in: query
+      schema: { type: integer, default: 25, minimum: 1, maximum: 100 }
+    PageToken:
+      name: page_token
+      in: query
+      schema: { type: string }
+      description: Токен следующей страницы; пусто, если страница последняя
 
   responses:
     BadRequest:
       description: Некорректный запрос / ошибка валидации
       content:
         application/json:
-          schema:
-            $ref: "#/components/schemas/Error"
+          schema: { $ref: "#/components/schemas/Error" }
     Unauthorized:
-      description: Невалидные учётные данные или токен
+      description: Отсутствует или невалиден токен/сессия
       content:
         application/json:
-          schema:
-            $ref: "#/components/schemas/Error"
+          schema: { $ref: "#/components/schemas/Error" }
+    Forbidden:
+      description: Недостаточно прав (требуется role=admin)
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    NotFound:
+      description: Пользователь не найден
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
 
   schemas:
+    Role:
+      type: string
+      enum: [user, admin]
+    Status:
+      type: string
+      enum: [active, blocked]
+
     RegisterRequest:
       type: object
       required: [login, password, first_name, last_name, email]
@@ -163,18 +407,6 @@ components:
         login: { type: string }
         password: { type: string }
 
-    RefreshRequest:
-      type: object
-      required: [refresh_token]
-      properties:
-        refresh_token: { type: string }
-
-    LogoutRequest:
-      type: object
-      required: [refresh_token]
-      properties:
-        refresh_token: { type: string }
-
     User:
       type: object
       properties:
@@ -185,26 +417,92 @@ components:
         patronymic: { type: string }
         email: { type: string, format: email }
         phone_number: { type: string }
-
-    Tokens:
-      type: object
-      properties:
-        access_token: { type: string }
-        refresh_token: { type: string }
+        role: { $ref: "#/components/schemas/Role" }
+        status: { $ref: "#/components/schemas/Status" }
+        last_login_at: { type: string, format: date-time }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
 
     LoginResponse:
       type: object
       properties:
         user:
           $ref: "#/components/schemas/User"
-        tokens:
-          $ref: "#/components/schemas/Tokens"
 
     Me:
       type: object
       properties:
         user_id: { type: string, format: uuid }
-        role: { type: string }
+        role: { $ref: "#/components/schemas/Role" }
+
+    Balance:
+      type: object
+      properties:
+        points: { type: integer, format: int64 }
+        updated_at: { type: string, format: date-time }
+
+    Transaction:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        user_id: { type: string, format: uuid }
+        operation_id: { type: string, format: uuid }
+        order_id: { type: string, format: uuid }
+        amount:
+          type: integer
+          format: int64
+          description: Положительное при начислении, отрицательное при списании
+        reason: { type: string }
+        created_at: { type: string, format: date-time }
+
+    TransactionsResponse:
+      type: object
+      properties:
+        transactions:
+          type: array
+          items: { $ref: "#/components/schemas/Transaction" }
+        next_page_token:
+          type: string
+          description: Токен следующей страницы; пусто, если страница последняя
+
+    ListUsersResponse:
+      type: object
+      properties:
+        users:
+          type: array
+          items: { $ref: "#/components/schemas/User" }
+        next_page_token:
+          type: string
+          description: Токен следующей страницы; пусто, если страница последняя
+
+    GrantPointsRequest:
+      type: object
+      required: [amount, operation_id]
+      properties:
+        amount: { type: integer, format: int64, minimum: 1 }
+        operation_id:
+          type: string
+          format: uuid
+          description: Идемпотентный ключ операции
+        reason: { type: string }
+
+    BlockUserRequest:
+      type: object
+      required: [blocked]
+      properties:
+        blocked: { type: boolean }
+        reason: { type: string }
+
+    ChangeRoleRequest:
+      type: object
+      required: [role]
+      properties:
+        role: { $ref: "#/components/schemas/Role" }
+
+    ResetPasswordResponse:
+      type: object
+      properties:
+        new_password: { type: string }
 
     Error:
       type: object
@@ -213,4 +511,4 @@ components:
         message: { type: string }
 
 security:
-  - bearerAuth: []
+  - cookieAuth: []
