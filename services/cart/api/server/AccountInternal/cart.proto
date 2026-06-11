@@ -1,0 +1,70 @@
+syntax = "proto3";
+
+package cart.v1;
+
+option go_package = "github.com/mihnpro/Merch_shop/services/cart/api/server/AccountInternal;cartpb";
+
+// Cart Service — корзина пользователя.
+// user_id передаётся через gRPC metadata "x-user-id" (добавляет Gateway после валидации JWT).
+service CartService {
+
+    // Получить корзину текущего пользователя.
+    rpc GetCart(GetCartRequest) returns (GetCartResponse);
+
+    // Добавить товар в корзину (или увеличить qty, если позиция уже есть).
+    rpc AddItem(AddItemRequest) returns (AddItemResponse);
+
+    // Изменить количество позиции. qty=0 — удалить позицию.
+    rpc UpdateItem(UpdateItemRequest) returns (UpdateItemResponse);
+
+    // Удалить позицию из корзины (идемпотентно).
+    rpc RemoveItem(RemoveItemRequest) returns (RemoveItemResponse);
+
+    // Очистить всю корзину (идемпотентно). Вызывается Order Service после оформления заказа.
+    rpc ClearCart(ClearCartRequest) returns (ClearCartResponse);
+}
+
+message CartItem {
+    string item_id        = 1;
+    string product_id     = 2;
+    string product_name   = 3;
+    int32  quantity       = 4;
+    int32  price_per_unit = 5;
+    int32  line_total     = 6;
+}
+
+message GetCartRequest {}
+
+message GetCartResponse {
+    repeated CartItem items      = 1;
+    int32             total      = 2;
+    int32             item_count = 3;
+}
+
+message AddItemRequest {
+    string product_id = 1;
+    int32  quantity   = 2;
+}
+
+message AddItemResponse {
+    CartItem item = 1;
+}
+
+message UpdateItemRequest {
+    string item_id      = 1;
+    int32  new_quantity = 2;
+}
+
+message UpdateItemResponse {
+    CartItem item = 1;
+}
+
+message RemoveItemRequest {
+    string item_id = 1;
+}
+
+message RemoveItemResponse {}
+
+message ClearCartRequest {}
+
+message ClearCartResponse {}

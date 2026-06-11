@@ -1,0 +1,99 @@
+syntax = "proto3";
+
+package inventory;
+
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/mihnpro/Merch_shop/services/invetory/api/server/AccountInternal;inventorypb";
+
+
+// Inventory Service — остатки по товарам и жизненный цикл резервов.
+// Размеры в MVP не используются: остаток и позиции резерва ключуются только по product_id.
+service InventoryService {
+
+    // Проверка доступности (вызывает Cart при AddItem).
+    rpc CheckStock(CheckStockRequest)         returns (CheckStockResponse);
+
+    // Резервирование под заказ; идемпотентно по order_id
+    // (вызывает консьюмер order.created).
+    rpc ReserveStock(ReserveStockRequest)     returns (Reservation);
+
+    // Снятие резерва при отмене заказа; идемпотентно по order_id
+    // (вызывает Order Service).
+    rpc ReleaseReserve(ReleaseReserveRequest) returns (Reservation);
+
+    // Корректировка остатка админом по дельте; идемпотентно по operation_id.
+    rpc AdjustStock(AdjustStockRequest)       returns (AdjustStockResponse);
+}
+
+
+// Остаток по товару.
+message Stock {
+    string product_id = 1;
+    int32  available  = 2;                    // доступно за вычетом резервов
+    int32  version    = 3;                    // оптимистическая блокировка
+    google.protobuf.Timestamp created_at = 4;
+    google.protobuf.Timestamp updated_at = 5;
+}
+
+// Позиция резерва.
+message ReservationItem {
+    string product_id = 1;
+    int32  qty        = 2;
+}
+
+// Резерв под заказ.
+message Reservation {
+    string id       = 1;
+    string order_id = 2;
+    repeated ReservationItem items = 3;
+    string released_reason = 4;               // заполняется при ReleaseReserve
+    google.protobuf.Timestamp released_at = 5; // null до снятия резерва
+    google.protobuf.Timestamp created_at  = 6;
+    google.protobuf.Timestamp updated_at  = 7;
+}
+
+
+// Проверка доступности товара. qty опционально: «хватит ли на qty штук».
+message CheckStockRequest {
+    string product_id = 1;
+    int32  qty        = 2;
+}
+
+// Результат проверки доступности.
+message CheckStockResponse {
+    string product_id = 1;
+    int32  available  = 2;
+    bool   in_stock   = 3;                    // available >= max(qty, 1)
+}
+
+
+// Резервирование позиций заказа. Идемпотентно по order_id.
+message ReserveStockRequest {
+    string order_id = 1;
+    repeated ReservationItem items = 2;
+}
+
+
+// Снятие резерва. Идемпотентно по order_id; reason — причина снятия.
+message ReleaseReserveRequest {
+    string order_id = 1;
+    string reason   = 2;
+}
+
+
+// Корректировка остатка админом по дельте (+ пополнение / - списание).
+// Идемпотентно по operation_id; reason обязателен.
+message AdjustStockRequest {
+    string product_id   = 1;
+    int32  delta        = 2;
+    string operation_id = 3;
+    string reason       = 4;
+}
+
+// Результат корректировки: новое доступное количество и версия.
+message AdjustStockResponse {
+    string product_id = 1;
+    int32  available  = 2;
+    int32  version    = 3;
+}

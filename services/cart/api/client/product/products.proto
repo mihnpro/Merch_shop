@@ -1,0 +1,120 @@
+syntax = "proto3";
+
+package products;
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/empty.proto";
+
+option go_package = "github.com/mihnpro/Merch_shop/services/products/api/server/AccountInternal;productpb";
+
+
+// Product Service — каталог товаров и справочник категорий.
+service ProductService {
+
+    // --- Товары ---
+    rpc ListProducts(ListProductsRequest)           returns (ListProductsResponse);
+    rpc GetProduct(GetProductRequest)               returns (Product);
+    rpc CreateProduct(CreateProductRequest)         returns (Product);                 
+    rpc UpdateProduct(UpdateProductRequest)         returns (Product);                 
+    rpc DeactivateProduct(DeactivateProductRequest) returns (google.protobuf.Empty);  
+
+    // --- Справочник категорий ---
+    rpc ListCategories(ListCategoriesRequest)       returns (ListCategoriesResponse);
+    rpc CreateCategory(CreateCategoryRequest)       returns (Category);                
+    rpc UpdateCategory(UpdateCategoryRequest)       returns (Category);               
+}
+
+// Товар каталога.
+message Product {
+    string id           = 1;
+    string name         = 2;
+    string description  = 3;
+    int64  price_points = 4;
+    Category category   = 5;
+    repeated string photo_keys = 7;
+    bool   active       = 8;
+    int32  version      = 9;                 
+    google.protobuf.Timestamp created_at = 10;
+    google.protobuf.Timestamp updated_at = 11;
+}
+
+// Категория товаров (справочник).
+message Category {
+    string id   = 1;
+    string code = 2;                        
+    string name = 3;                         
+    bool   active = 4;
+    google.protobuf.Timestamp created_at = 5;
+    google.protobuf.Timestamp updated_at = 6;
+}
+
+
+// Список товаров с фильтрами и пагинацией по токену.
+message ListProductsRequest {
+    string category_id = 1;                 
+    string search      = 2;                  
+    bool   active_only = 3;                 
+    int32  page_size   = 4;
+    string page_token  = 5;
+}
+
+// Страница списка товаров.
+message ListProductsResponse {
+    repeated Product products        = 1;
+    string           next_page_token = 2;
+}
+
+// Получение одного товара по идентификатору.
+message GetProductRequest {
+    string product_id = 1;
+}
+
+// Создание товара админом. photo_key получен от Media Service.
+message CreateProductRequest {
+    string name           = 1;
+    string description     = 2;
+    int64  price_points   = 3;
+    string category_id    = 4;
+    repeated string photo_keys = 6;
+}
+
+// Обновление товара админом. Идёт с version для оптимистической блокировки
+message UpdateProductRequest {
+    string product_id     = 1;
+    string name           = 2;
+    string description     = 3;
+    int64  price_points   = 4;
+    string category_id    = 5;
+    repeated string photo_keys = 7;
+    int32  version        = 8;
+    bool   active         = 9;        
+}
+
+// Деактивация товара (soft-delete).
+message DeactivateProductRequest {
+    string product_id = 1;
+}
+
+
+// Список категорий.
+message ListCategoriesRequest {
+    bool active_only = 1;                    
+}
+
+// Полный список категорий (справочник мал, без пагинации).
+message ListCategoriesResponse {
+    repeated Category categories = 1;
+}
+
+// Создание категории админом.
+message CreateCategoryRequest {
+    string code = 1;
+    string name = 2;
+}
+
+// Обновление категории админом (переименование / активация-деактивация).
+message UpdateCategoryRequest {
+    string id     = 1;
+    string name   = 2;
+    bool   active = 3;
+}
