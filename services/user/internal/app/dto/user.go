@@ -90,6 +90,19 @@ type ChangePasswordInput struct {
 	NewPassword string
 }
 
+type UpdateProfileInput struct {
+	UserID      string
+	FirstName   string
+	LastName    string
+	Patronymic  string
+	Email       string
+	PhoneNumber string
+}
+
+type UsersStatsView struct {
+	NewUsers int
+}
+
 type ListUsersInput struct {
 	Search    string
 	RoleCode  string

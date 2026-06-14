@@ -126,6 +126,30 @@ paths:
         "403":
           $ref: "#/components/responses/Forbidden"
 
+  /admin/analytics:
+    get:
+      tags: [admin]
+      summary: Базовая аналитика заказов за период
+      description: >-
+        Сводка за период (день/неделя/месяц): число заказов, объём списанных
+        баллов, средний чек и топ товаров. Отменённые заказы исключаются.
+      parameters:
+        - name: period
+          in: query
+          schema: { type: string, enum: [day, week, month], default: day }
+          description: Период агрегации; по умолчанию day
+      responses:
+        "200":
+          description: Сводка
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Analytics"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
   /admin/orders/{id}/status:
     put:
       tags: [admin]
@@ -276,6 +300,30 @@ components:
         next_page_token:
           type: string
           description: Токен следующей страницы; пусто, если страница последняя
+
+    TopProduct:
+      type: object
+      properties:
+        product_id: { type: string, format: uuid }
+        product_name: { type: string }
+        quantity: { type: integer }
+
+    Analytics:
+      type: object
+      properties:
+        period: { type: string, enum: [day, week, month] }
+        orders_count: { type: integer }
+        points_spent:
+          type: integer
+          format: int64
+          description: Сумма списанных баллов по неотменённым заказам
+        average_order_value:
+          type: integer
+          format: int64
+          description: Средний чек (points_spent / orders_count), 0 при отсутствии заказов
+        top_products:
+          type: array
+          items: { $ref: "#/components/schemas/TopProduct" }
 
     Error:
       type: object

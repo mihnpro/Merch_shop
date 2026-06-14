@@ -11,5 +11,6 @@ import (
 type StockRepository interface {
 	List(ctx context.Context) ([]*model.Stock, error)
 	GetByProductID(ctx context.Context, productID uuid.UUID) (*model.Stock, error)
+	GetByProductIDs(ctx context.Context, productIDs []uuid.UUID) ([]*model.Stock, error)
 	Adjust(ctx context.Context, adj *model.StockAdjustment) (*model.Stock, error)
 }

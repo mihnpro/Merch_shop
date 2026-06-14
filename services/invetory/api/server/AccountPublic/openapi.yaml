@@ -13,10 +13,38 @@ servers:
     description: Базовый префикс (gateway проксирует по нему в inventory-сервис)
 
 tags:
+  - name: stock
+    description: Чтение остатков (любой авторизованный пользователь)
   - name: admin
     description: Управление остатками (только role=admin)
 
 paths:
+  /stock:
+    get:
+      tags: [stock]
+      summary: Остатки по списку товаров
+      description: >-
+        Возвращает доступное количество для перечисленных товаров. Доступно
+        любому авторизованному пользователю. По товарам без строки остатка
+        возвращается available=0. Поле version в этом ответе не заполняется.
+      parameters:
+        - name: product_ids
+          in: query
+          required: true
+          schema: { type: string }
+          description: Список UUID товаров через запятую
+      responses:
+        "200":
+          description: Список остатков
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListStockResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
   /admin/inventory:
     get:
       tags: [admin]

@@ -1,6 +1,13 @@
 import { useEffect, useState } from "react";
-import { grantPoints, listUsers } from "../../api/admin";
-import type { AdminUser } from "../../api/types";
+import {
+  blockUser,
+  changeUserRole,
+  getUserTransactions,
+  grantPoints,
+  listUsers,
+  resetUserPassword,
+} from "../../api/admin";
+import type { AdminUser, Transaction } from "../../api/types";
 
 export default function UsersPanel() {
   const [users, setUsers] = useState<AdminUser[]>([]);
@@ -28,20 +35,8 @@ export default function UsersPanel() {
     await reload(search.trim());
   }
 
-  async function handleGrant(user: AdminUser, amount: number, reason: string) {
-    setError("");
-    setInfo("");
-    try {
-      const bal = await grantPoints(user.id, {
-        amount,
-        reason,
-        operation_id: crypto.randomUUID(),
-      });
-      setInfo(`Начислено ${amount} баллов пользователю ${user.login}. Новый баланс: ${bal.points}.`);
-      setOpenId(null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Ошибка");
-    }
+  function replaceUser(updated: AdminUser) {
+    setUsers((prev) => prev.map((u) => (u.id === updated.id ? updated : u)));
   }
 
   return (
@@ -83,7 +78,9 @@ export default function UsersPanel() {
                 user={u}
                 open={openId === u.id}
                 onToggle={() => setOpenId(openId === u.id ? null : u.id)}
-                onGrant={handleGrant}
+                onUpdated={replaceUser}
+                onInfo={setInfo}
+                onError={setError}
               />
             ))}
           </tbody>
@@ -97,21 +94,78 @@ function UserRow({
   user,
   open,
   onToggle,
-  onGrant,
+  onUpdated,
+  onInfo,
+  onError,
 }: {
   user: AdminUser;
   open: boolean;
   onToggle: () => void;
-  onGrant: (user: AdminUser, amount: number, reason: string) => void;
+  onUpdated: (user: AdminUser) => void;
+  onInfo: (msg: string) => void;
+  onError: (msg: string) => void;
 }) {
   const [amount, setAmount] = useState("");
   const [reason, setReason] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [txs, setTxs] = useState<Transaction[] | null>(null);
 
-  function submit(event: React.FormEvent) {
+  const blocked = user.status === "blocked";
+
+  function notify(fn: () => Promise<void>) {
+    onError("");
+    onInfo("");
+    setBusy(true);
+    fn()
+      .catch((err) => onError(err instanceof Error ? err.message : "Ошибка"))
+      .finally(() => setBusy(false));
+  }
+
+  function handleGrant(event: React.FormEvent) {
     event.preventDefault();
     const value = Number(amount);
     if (!Number.isInteger(value) || value <= 0) return;
-    onGrant(user, value, reason.trim() || "начисление администратором");
+    notify(async () => {
+      const bal = await grantPoints(user.id, {
+        amount: value,
+        reason: reason.trim() || "начисление администратором",
+        operation_id: crypto.randomUUID(),
+      });
+      onInfo(`Начислено ${value} баллов пользователю ${user.login}. Новый баланс: ${bal.points}.`);
+      setAmount("");
+      setReason("");
+    });
+  }
+
+  function handleBlock() {
+    notify(async () => {
+      const updated = await blockUser(user.id, !blocked);
+      onUpdated(updated);
+      onInfo(`Пользователь ${user.login} ${updated.status === "blocked" ? "заблокирован" : "разблокирован"}.`);
+    });
+  }
+
+  function handleRole() {
+    const nextRole = user.role === "admin" ? "user" : "admin";
+    notify(async () => {
+      const updated = await changeUserRole(user.id, nextRole);
+      onUpdated(updated);
+      onInfo(`Роль пользователя ${user.login} изменена на «${updated.role}».`);
+    });
+  }
+
+  function handleReset() {
+    notify(async () => {
+      const res = await resetUserPassword(user.id);
+      onInfo(`Новый пароль для ${user.login}: ${res.new_password} (покажите пользователю и не сохраняйте).`);
+    });
+  }
+
+  function handleLoadTxs() {
+    notify(async () => {
+      const res = await getUserTransactions(user.id, { page_size: 25 });
+      setTxs(res.transactions ?? []);
+    });
   }
 
   return (
@@ -123,17 +177,36 @@ function UserRow({
         </td>
         <td>{user.email}</td>
         <td>{user.role}</td>
-        <td>{user.status}</td>
+        <td>
+          <span className={blocked ? "status-badge status-cancelled" : "status-badge status-delivered"}>
+            {blocked ? "заблокирован" : "активен"}
+          </span>
+        </td>
         <td className="actions">
           <button type="button" className="btn-secondary" onClick={onToggle}>
-            {open ? "Отмена" : "Начислить баллы"}
+            {open ? "Свернуть" : "Управление"}
           </button>
         </td>
       </tr>
       {open && (
         <tr>
           <td colSpan={6}>
-            <form className="grant-form" onSubmit={submit}>
+            <div className="actions" style={{ marginBottom: 12, flexWrap: "wrap" }}>
+              <button type="button" className="btn-secondary" disabled={busy} onClick={handleBlock}>
+                {blocked ? "Разблокировать" : "Заблокировать"}
+              </button>
+              <button type="button" className="btn-secondary" disabled={busy} onClick={handleRole}>
+                {user.role === "admin" ? "Снять админа" : "Сделать админом"}
+              </button>
+              <button type="button" className="btn-secondary" disabled={busy} onClick={handleReset}>
+                Сбросить пароль
+              </button>
+              <button type="button" className="btn-secondary" disabled={busy} onClick={handleLoadTxs}>
+                История операций
+              </button>
+            </div>
+
+            <form className="grant-form" onSubmit={handleGrant}>
               <label>
                 Сумма баллов
                 <input
@@ -153,8 +226,39 @@ function UserRow({
                   placeholder="бонус за активность"
                 />
               </label>
-              <button type="submit">Начислить</button>
+              <button type="submit" disabled={busy}>
+                Начислить
+              </button>
             </form>
+
+            {txs && (
+              <div className="table-wrap" style={{ marginTop: 12 }}>
+                {txs.length === 0 ? (
+                  <p className="muted">Операций нет</p>
+                ) : (
+                  <table className="table">
+                    <thead>
+                      <tr>
+                        <th>Дата</th>
+                        <th>Сумма</th>
+                        <th>Причина</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {txs.map((t) => (
+                        <tr key={t.id}>
+                          <td>{new Date(t.created_at).toLocaleString("ru-RU")}</td>
+                          <td style={{ color: t.amount >= 0 ? "#1a7f37" : "#cf222e" }}>
+                            {t.amount > 0 ? `+${t.amount}` : t.amount}
+                          </td>
+                          <td>{t.reason}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            )}
           </td>
         </tr>
       )}

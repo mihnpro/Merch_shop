@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"time"
 
 	"github.com/mihnpro/Merch_shop/services/user_customer/internal/app/dto"
 	"github.com/mihnpro/Merch_shop/services/user_customer/internal/app/port"
@@ -20,6 +21,7 @@ type AdminService interface {
 	ChangeRole(ctx context.Context, userID, role string) (dto.UserView, error)
 	ListUsers(ctx context.Context, in dto.ListUsersInput) ([]dto.UserView, string, error)
 	GetTransactions(ctx context.Context, in dto.GetTransactionsInput) ([]dto.TransactionView, string, error)
+	NewUsersStats(ctx context.Context, period string) (dto.UsersStatsView, error)
 }
 
 type adminService struct {
@@ -142,6 +144,25 @@ func (s *adminService) GetTransactions(ctx context.Context, in dto.GetTransactio
 		return nil, "", err
 	}
 	return toTransactionViews(txs), nextToken, nil
+}
+
+func (s *adminService) NewUsersStats(ctx context.Context, period string) (dto.UsersStatsView, error) {
+	n, err := s.users.CountUsersCreatedSince(ctx, periodSince(period))
+	if err != nil {
+		return dto.UsersStatsView{}, err
+	}
+	return dto.UsersStatsView{NewUsers: n}, nil
+}
+func periodSince(period string) time.Time {
+	now := time.Now()
+	switch period {
+	case "week":
+		return now.AddDate(0, 0, -7)
+	case "month":
+		return now.AddDate(0, -1, 0)
+	default:
+		return now.AddDate(0, 0, -1)
+	}
 }
 
 func generatePassword(length int) (string, error) {

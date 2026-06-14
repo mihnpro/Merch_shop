@@ -107,6 +107,16 @@ func (s *Server) AdminUpdateOrderStatus(w http.ResponseWriter, r *http.Request) 
 	writeJSON(w, http.StatusOK, view)
 }
 
+func (s *Server) AdminAnalytics(w http.ResponseWriter, r *http.Request) {
+	period := r.URL.Query().Get("period")
+	view, err := s.query.GetAnalytics(r.Context(), period)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, view)
+}
+
 func (s *Server) AdminListOrders(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	views, nextToken, err := s.query.ListOrders(r.Context(), dto.ListOrdersInput{

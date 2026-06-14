@@ -2,6 +2,7 @@ package psql
 
 import (
 	"context"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
@@ -58,6 +59,18 @@ func (r *userRepository) UpdateUserRole(ctx context.Context, id uuid.UUID, role 
 		return nil, err
 	}
 	return row.toModel(), nil
+}
+
+func (r *userRepository) UpdateUserProfile(ctx context.Context, id uuid.UUID, p repository.ProfileUpdate) (*model.User, error) {
+	row, err := updateUserProfile(ctx, r.db, id, p)
+	if err != nil {
+		return nil, err
+	}
+	return row.toModel(), nil
+}
+
+func (r *userRepository) CountUsersCreatedSince(ctx context.Context, since time.Time) (int, error) {
+	return countUsersCreatedSince(ctx, r.db, since)
 }
 
 func (r *userRepository) UpdatePassword(ctx context.Context, id uuid.UUID, hash vo.PasswordHash) error {
