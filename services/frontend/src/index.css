@@ -868,3 +868,43 @@ a.product-card:hover {
   background: #fdecef;
   color: #b00020;
 }
+
+.stat-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.stat-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: #fff;
+  border-radius: 12px;
+  padding: 18px 20px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
+}
+
+.stat-value {
+  font-size: 28px;
+  font-weight: 700;
+  color: #1a1a1a;
+}
+
+.stat-label {
+  font-size: 13px;
+  color: #666;
+}
+
+.cart-item-over {
+  outline: 1px solid #f3c2cb;
+  background: #fff6f7;
+  border-radius: 8px;
+}
+
+.cart-item-info span {
+  display: block;
+  font-size: 13px;
+  margin-top: 2px;
+}
