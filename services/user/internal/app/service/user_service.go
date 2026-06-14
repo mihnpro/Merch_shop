@@ -17,6 +17,7 @@ import (
 
 type UserService interface {
 	GetUser(ctx context.Context, userID string) (dto.UserView, error)
+	UpdateProfile(ctx context.Context, in dto.UpdateProfileInput) (dto.UserView, error)
 	ChangePassword(ctx context.Context, in dto.ChangePasswordInput) error
 	GetBalance(ctx context.Context, userID string) (dto.BalanceView, error)
 	GetTransactions(ctx context.Context, in dto.GetTransactionsInput) ([]dto.TransactionView, string, error)
@@ -41,6 +42,40 @@ func (s *userService) GetUser(ctx context.Context, userID string) (dto.UserView,
 		return dto.UserView{}, domain.ErrInvalidInput
 	}
 	u, err := s.users.GetUserByID(ctx, id)
+	if err != nil {
+		return dto.UserView{}, err
+	}
+	return toUserView(u), nil
+}
+
+func (s *userService) UpdateProfile(ctx context.Context, in dto.UpdateProfileInput) (dto.UserView, error) {
+	id, err := parseUUID(in.UserID)
+	if err != nil {
+		return dto.UserView{}, domain.ErrInvalidInput
+	}
+	firstName := strings.TrimSpace(in.FirstName)
+	if firstName == "" {
+		return dto.UserView{}, domain.ErrEmptyFirstName
+	}
+	lastName := strings.TrimSpace(in.LastName)
+	if lastName == "" {
+		return dto.UserView{}, domain.ErrEmptyLastName
+	}
+	email, err := vo.NewEmail(in.Email)
+	if err != nil {
+		return dto.UserView{}, err
+	}
+	phone, err := vo.NewPhoneNumber(in.PhoneNumber)
+	if err != nil {
+		return dto.UserView{}, err
+	}
+	u, err := s.users.UpdateUserProfile(ctx, id, repository.ProfileUpdate{
+		FirstName:   firstName,
+		LastName:    lastName,
+		Patronymic:  strings.TrimSpace(in.Patronymic),
+		Email:       email.String(),
+		PhoneNumber: phone.String(),
+	})
 	if err != nil {
 		return dto.UserView{}, err
 	}
