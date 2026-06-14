@@ -2,6 +2,7 @@ package psql
 
 import (
 	"context"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
@@ -72,6 +73,10 @@ func (r *orderRepository) GetOrderByID(ctx context.Context, id uuid.UUID) (*mode
 
 func (r *orderRepository) UpdateOrderStatus(ctx context.Context, id uuid.UUID, status model.OrderStatus) error {
 	return updateOrderStatus(ctx, r.db, id, status)
+}
+
+func (r *orderRepository) GetAnalytics(ctx context.Context, since time.Time) (repository.Analytics, error) {
+	return selectAnalytics(ctx, r.db, since)
 }
 
 func (r *orderRepository) ListOrders(ctx context.Context, f repository.ListOrdersFilter) ([]*model.Order, string, error) {
