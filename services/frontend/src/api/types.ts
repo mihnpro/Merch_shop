@@ -35,6 +35,54 @@ export interface MeResponse {
   role: Role;
 }
 
+export interface UserProfile {
+  id: string;
+  login: string;
+  first_name: string;
+  last_name: string;
+  patronymic?: string;
+  email: string;
+  phone_number?: string;
+  role: Role;
+  status: string;
+  last_login_at?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface UpdateProfileBody {
+  first_name: string;
+  last_name: string;
+  patronymic?: string;
+  email: string;
+  phone_number?: string;
+}
+
+export interface ChangePasswordBody {
+  old_password: string;
+  new_password: string;
+}
+
+export interface Transaction {
+  id: string;
+  user_id: string;
+  operation_id: string;
+  order_id?: string;
+  amount: number;
+  reason: string;
+  created_at: string;
+}
+
+export interface TransactionsResponse {
+  transactions: Transaction[];
+  next_page_token?: string;
+}
+
+export interface TransactionsParams {
+  page_size?: number;
+  page_token?: string;
+}
+
 export interface Category {
   id: string;
   code: string;
@@ -215,4 +263,49 @@ export interface GrantPointsBody {
 export interface BalanceResponse {
   points: number;
   updated_at: string;
+}
+
+export interface ResetPasswordResponse {
+  new_password: string;
+}
+
+export interface BlockUserBody {
+  blocked: boolean;
+  reason?: string;
+}
+
+export interface ChangeRoleBody {
+  role: Role;
+}
+
+export interface AdminListOrdersParams {
+  user_id?: string;
+  status?: string;
+  page_size?: number;
+  page_token?: string;
+}
+
+export interface UpdateOrderStatusBody {
+  status: OrderStatus;
+  reason?: string;
+}
+
+export type AnalyticsPeriod = "day" | "week" | "month";
+
+export interface TopProduct {
+  product_id: string;
+  product_name: string;
+  quantity: number;
+}
+
+export interface AnalyticsView {
+  period: AnalyticsPeriod;
+  orders_count: number;
+  points_spent: number;
+  average_order_value: number;
+  top_products: TopProduct[];
+}
+
+export interface UsersStats {
+  new_users: number;
 }
