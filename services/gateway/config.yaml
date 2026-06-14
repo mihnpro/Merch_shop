@@ -29,6 +29,9 @@ routes:
   - prefix: /api/v1/admin/media
     service: media
 
+  - prefix: /api/v1/stock
+    service: inventory
+
   - prefix: /api/v1/admin/inventory
     service: inventory
 
@@ -39,6 +42,9 @@ routes:
     service: order
 
   - prefix: /api/v1/admin/orders
+    service: order
+
+  - prefix: /api/v1/admin/analytics
     service: order
 
   - prefix: /api/v1/admin/users
