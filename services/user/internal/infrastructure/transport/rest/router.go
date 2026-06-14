@@ -13,11 +13,15 @@ func NewRouter(s *Server, mw *Middleware) http.Handler {
 
 	// Self (authenticated user)
 	mux.Handle("GET /api/v1/me", mw.Auth(http.HandlerFunc(s.Me)))
+	mux.Handle("GET /api/v1/me/profile", mw.Auth(http.HandlerFunc(s.MeProfile)))
+	mux.Handle("PUT /api/v1/me/profile", mw.Auth(http.HandlerFunc(s.UpdateMyProfile)))
+	mux.Handle("POST /api/v1/me/password", mw.Auth(http.HandlerFunc(s.ChangeMyPassword)))
 	mux.Handle("GET /api/v1/me/balance", mw.Auth(http.HandlerFunc(s.GetMyBalance)))
 	mux.Handle("GET /api/v1/me/transactions", mw.Auth(http.HandlerFunc(s.GetMyTransactions)))
 
 	// Admin
 	mux.Handle("GET /api/v1/admin/users", mw.Admin(http.HandlerFunc(s.AdminListUsers)))
+	mux.Handle("GET /api/v1/admin/users/stats", mw.Admin(http.HandlerFunc(s.AdminUsersStats)))
 	mux.Handle("GET /api/v1/admin/users/{id}", mw.Admin(http.HandlerFunc(s.AdminGetUser)))
 	mux.Handle("POST /api/v1/admin/users/{id}/grant-points", mw.Admin(http.HandlerFunc(s.AdminGrantPoints)))
 	mux.Handle("POST /api/v1/admin/users/{id}/reset-password", mw.Admin(http.HandlerFunc(s.AdminResetPassword)))

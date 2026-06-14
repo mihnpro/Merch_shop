@@ -103,7 +103,6 @@ func (s *Server) GetMyTransactions(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, toTransactionsResponse(txs, nextToken))
 }
 
-// ─── Admin: users ─────────────────────────────────────────────────────────────
 
 func (s *Server) AdminListUsers(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
@@ -205,6 +204,20 @@ func (s *Server) AdminChangeRole(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, toUserResponse(view))
+}
+
+type usersStatsResponse struct {
+	NewUsers int `json:"new_users"`
+}
+
+func (s *Server) AdminUsersStats(w http.ResponseWriter, r *http.Request) {
+	period := r.URL.Query().Get("period")
+	stats, err := s.admin.NewUsersStats(r.Context(), period)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, usersStatsResponse{NewUsers: stats.NewUsers})
 }
 
 func (s *Server) AdminGetUserTransactions(w http.ResponseWriter, r *http.Request) {

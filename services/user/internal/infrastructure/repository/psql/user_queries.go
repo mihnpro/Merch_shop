@@ -68,9 +68,11 @@ const (
 	insertUserSQL        = `INSERT INTO users (login, password_hash, first_name, last_name, patronymic, email, phone_number, role)
 	VALUES ($1, $2, $3, $4, $5, $6, $7, 'user')
 	RETURNING id`
-	updateUserStatusSQL = `UPDATE users SET status = $2 WHERE id = $1 RETURNING ` + selectUserCols
-	updateUserRoleSQL   = `UPDATE users SET role = $2 WHERE id = $1 RETURNING ` + selectUserCols
-	updatePasswordSQL   = `UPDATE users SET password_hash = $2 WHERE id = $1`
+	updateUserStatusSQL  = `UPDATE users AS u SET status = $2 WHERE u.id = $1 RETURNING ` + selectUserCols
+	updateUserRoleSQL    = `UPDATE users AS u SET role = $2 WHERE u.id = $1 RETURNING ` + selectUserCols
+	updateUserProfileSQL = `UPDATE users AS u SET first_name = $2, last_name = $3, patronymic = $4, email = $5, phone_number = $6 WHERE u.id = $1 RETURNING ` + selectUserCols
+	updatePasswordSQL    = `UPDATE users SET password_hash = $2 WHERE id = $1`
+	countUsersSinceSQL   = `SELECT count(*) FROM users WHERE created_at >= $1`
 )
 
 
@@ -88,6 +90,24 @@ func updateUserStatus(ctx context.Context, q sqlx.QueryerContext, id uuid.UUID, 
 
 func updateUserRole(ctx context.Context, q sqlx.QueryerContext, id uuid.UUID, role string) (*userRow, error) {
 	return getUserRow(ctx, q, updateUserRoleSQL, id, role)
+}
+
+func updateUserProfile(ctx context.Context, q sqlx.QueryerContext, id uuid.UUID, p repository.ProfileUpdate) (*userRow, error) {
+	return getUserRow(ctx, q, updateUserProfileSQL, id,
+		p.FirstName,
+		p.LastName,
+		nullIfEmpty(p.Patronymic),
+		nullIfEmpty(p.Email),
+		nullIfEmpty(p.PhoneNumber),
+	)
+}
+
+func countUsersCreatedSince(ctx context.Context, q sqlx.QueryerContext, since time.Time) (int, error) {
+	var n int
+	if err := sqlx.GetContext(ctx, q, &n, countUsersSinceSQL, since); err != nil {
+		return 0, err
+	}
+	return n, nil
 }
 
 func getUserRow(ctx context.Context, q sqlx.QueryerContext, query string, args ...any) (*userRow, error) {

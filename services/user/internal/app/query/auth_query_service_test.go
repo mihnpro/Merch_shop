@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -50,6 +51,14 @@ func (m *mockUserRepo) UpdateUserStatus(ctx context.Context, id uuid.UUID, statu
 
 func (m *mockUserRepo) UpdateUserRole(ctx context.Context, id uuid.UUID, role vo.Role) (*model.User, error) {
 	return nil, domain.ErrUserNotFound
+}
+
+func (m *mockUserRepo) UpdateUserProfile(ctx context.Context, id uuid.UUID, p repository.ProfileUpdate) (*model.User, error) {
+	return nil, domain.ErrUserNotFound
+}
+
+func (m *mockUserRepo) CountUsersCreatedSince(ctx context.Context, since time.Time) (int, error) {
+	return 0, nil
 }
 
 func (m *mockUserRepo) UpdatePassword(ctx context.Context, id uuid.UUID, hash vo.PasswordHash) error {

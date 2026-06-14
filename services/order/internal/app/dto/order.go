@@ -42,3 +42,17 @@ type ListOrdersInput struct {
 	PageSize  int
 	PageToken string
 }
+
+type TopProductView struct {
+	ProductID   string `json:"product_id"`
+	ProductName string `json:"product_name"`
+	Quantity    int    `json:"quantity"`
+}
+
+type AnalyticsView struct {
+	Period            string           `json:"period"`
+	OrdersCount       int              `json:"orders_count"`
+	PointsSpent       int64            `json:"points_spent"`
+	AverageOrderValue int64            `json:"average_order_value"`
+	TopProducts       []TopProductView `json:"top_products"`
+}

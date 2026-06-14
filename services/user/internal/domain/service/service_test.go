@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -47,6 +48,14 @@ func (f *fakeUserRepo) UpdateUserStatus(ctx context.Context, id uuid.UUID, statu
 
 func (f *fakeUserRepo) UpdateUserRole(ctx context.Context, id uuid.UUID, role vo.Role) (*model.User, error) {
 	return nil, domain.ErrUserNotFound
+}
+
+func (f *fakeUserRepo) UpdateUserProfile(ctx context.Context, id uuid.UUID, p repository.ProfileUpdate) (*model.User, error) {
+	return nil, domain.ErrUserNotFound
+}
+
+func (f *fakeUserRepo) CountUsersCreatedSince(ctx context.Context, since time.Time) (int, error) {
+	return 0, nil
 }
 
 func (f *fakeUserRepo) UpdatePassword(ctx context.Context, id uuid.UUID, hash vo.PasswordHash) error {

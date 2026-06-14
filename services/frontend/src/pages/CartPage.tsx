@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import NavBar from "../components/NavBar";
 import { useCart } from "../lib/CartContext";
 import { getProduct } from "../api/catalog";
+import { getStock } from "../api/stock";
 import { createOrder } from "../api/orders";
 import { getMyBalance } from "../api/auth";
 import { photoUrl } from "../lib/media";
@@ -30,6 +31,7 @@ export default function CartPage() {
   }, []);
 
   const [covers, setCovers] = useState<Record<string, string | undefined>>({});
+  const [stock, setStock] = useState<Record<string, number>>({});
 
   async function handleQty(itemId: string, newQty: number) {
     if (busy) return;
@@ -96,11 +98,16 @@ export default function CartPage() {
 
   const items = cart?.items ?? [];
 
+  const hasShortage = items.some(
+    (i) => i.product_id in stock && i.quantity > stock[i.product_id],
+  );
+
   const productKey = Array.from(new Set(items.map((i) => i.product_id))).sort().join(",");
   useEffect(() => {
     const ids = productKey ? productKey.split(",") : [];
     if (ids.length === 0) {
       setCovers({});
+      setStock({});
       return;
     }
     let cancelled = false;
@@ -114,6 +121,11 @@ export default function CartPage() {
       if (cancelled) return;
       setCovers(Object.fromEntries(entries));
     });
+    getStock(ids)
+      .then((map) => {
+        if (!cancelled) setStock(map);
+      })
+      .catch(() => {});
     return () => {
       cancelled = true;
     };
@@ -136,8 +148,12 @@ export default function CartPage() {
       ) : (
         <>
           <ul className="cart-list">
-            {items.map((item) => (
-              <li key={item.id} className="cart-item">
+            {items.map((item) => {
+              const avail = stock[item.product_id];
+              const known = avail !== undefined;
+              const over = known && item.quantity > avail;
+              return (
+              <li key={item.id} className={`cart-item${over ? " cart-item-over" : ""}`}>
                 <Link to={`/catalog/${item.product_id}`} className="cart-item-photo">
                   {covers[item.product_id] ? (
                     <img src={covers[item.product_id]} alt={item.product_name} loading="lazy" />
@@ -148,6 +164,11 @@ export default function CartPage() {
                   <Link to={`/catalog/${item.product_id}`} className="cart-item-name">
                     {item.product_name}
                   </Link>
+                  {known && (
+                    <span className={over ? "error" : "muted"}>
+                      {over ? `В наличии только ${avail} шт` : `осталось ${avail} шт`}
+                    </span>
+                  )}
                 </div>
 
                 <div className="qty-controls">
@@ -163,7 +184,7 @@ export default function CartPage() {
                   <button
                     type="button"
                     onClick={() => handleQty(item.id, item.quantity + 1)}
-                    disabled={!!busy}
+                    disabled={!!busy || (known && item.quantity >= avail)}
                     aria-label="Увеличить"
                   >
                     +
@@ -184,7 +205,8 @@ export default function CartPage() {
                   ✕
                 </button>
               </li>
-            ))}
+              );
+            })}
           </ul>
 
           <div className="cart-total">
@@ -195,6 +217,12 @@ export default function CartPage() {
             <p className={`cart-balance${balance < cart!.total ? " cart-balance-low" : ""}`}>
               Доступно баллов: <strong>{balance}</strong>
               {balance < cart!.total && " — недостаточно для заказа"}
+            </p>
+          )}
+
+          {hasShortage && (
+            <p className="cart-balance cart-balance-low">
+              Некоторых товаров недостаточно на складе — уменьшите количество
             </p>
           )}
 
@@ -222,7 +250,9 @@ export default function CartPage() {
             <button
               type="button"
               onClick={handleCheckout}
-              disabled={!!busy || (balance !== null && balance < cart!.total)}
+              disabled={
+                !!busy || hasShortage || (balance !== null && balance < cart!.total)
+              }
             >
               {busy === "checkout" ? "Оформляем…" : "Заказать"}
             </button>

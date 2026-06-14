@@ -37,6 +37,7 @@ type orderItemRow struct {
 }
 
 
+
 func insertOrder(ctx context.Context, exec sqlx.ExecerContext, order *model.Order) error {
 	_, err := exec.ExecContext(ctx,
 		`INSERT INTO orders (id, user_id, total_points, status, delivery_address, created_at, updated_at)
@@ -139,6 +140,49 @@ func selectOrdersPage(ctx context.Context, db *sqlx.DB, f repository.ListOrdersF
 		return nil, err
 	}
 	return rows, nil
+}
+
+func selectAnalytics(ctx context.Context, db *sqlx.DB, since time.Time) (repository.Analytics, error) {
+	var agg struct {
+		OrdersCount int   `db:"orders_count"`
+		PointsSpent int64 `db:"points_spent"`
+	}
+	if err := sqlx.GetContext(ctx, db, &agg,
+		`SELECT count(*) AS orders_count, COALESCE(SUM(total_points), 0) AS points_spent
+		 FROM orders
+		 WHERE created_at >= $1 AND status <> 'cancelled'`, since); err != nil {
+		return repository.Analytics{}, err
+	}
+
+	var topRows []struct {
+		ProductID   uuid.UUID `db:"product_id"`
+		ProductName string    `db:"product_name"`
+		Quantity    int       `db:"quantity"`
+	}
+	if err := sqlx.SelectContext(ctx, db, &topRows,
+		`SELECT oi.product_id, oi.product_name, SUM(oi.quantity) AS quantity
+		 FROM order_items oi
+		 JOIN orders o ON o.id = oi.order_id
+		 WHERE o.created_at >= $1 AND o.status <> 'cancelled'
+		 GROUP BY oi.product_id, oi.product_name
+		 ORDER BY quantity DESC, oi.product_name ASC
+		 LIMIT 5`, since); err != nil {
+		return repository.Analytics{}, err
+	}
+
+	top := make([]repository.TopProduct, 0, len(topRows))
+	for _, r := range topRows {
+		top = append(top, repository.TopProduct{
+			ProductID:   r.ProductID,
+			ProductName: r.ProductName,
+			Quantity:    r.Quantity,
+		})
+	}
+	return repository.Analytics{
+		OrdersCount: agg.OrdersCount,
+		PointsSpent: agg.PointsSpent,
+		TopProducts: top,
+	}, nil
 }
 
 func selectOrderItemsByIDs(ctx context.Context, db *sqlx.DB, ids []uuid.UUID) ([]orderItemRow, error) {

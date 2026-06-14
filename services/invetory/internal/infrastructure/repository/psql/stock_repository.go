@@ -72,6 +72,30 @@ func (r *stockRepository) GetByProductID(ctx context.Context, productID uuid.UUI
 	}
 	return row.toModel(), nil
 }
+
+func (r *stockRepository) GetByProductIDs(ctx context.Context, productIDs []uuid.UUID) ([]*model.Stock, error) {
+	if len(productIDs) == 0 {
+		return []*model.Stock{}, nil
+	}
+	query, args, err := sqlx.In(`
+		SELECT product_id, available, version, created_at, updated_at
+		FROM stock
+		WHERE product_id IN (?)`, productIDs)
+	if err != nil {
+		return nil, err
+	}
+	query = r.db.Rebind(query)
+
+	var rows []stockRow
+	if err := r.db.SelectContext(ctx, &rows, query, args...); err != nil {
+		return nil, err
+	}
+	stocks := make([]*model.Stock, 0, len(rows))
+	for i := range rows {
+		stocks = append(stocks, rows[i].toModel())
+	}
+	return stocks, nil
+}
 const insertAdjustment = `
 	INSERT INTO stock_adjustments (operation_id, product_id, delta, reason)
 	VALUES ($1, $2, $3, $4)

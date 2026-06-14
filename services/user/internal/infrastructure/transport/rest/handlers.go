@@ -128,6 +128,81 @@ func (s *Server) Me(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, meResponse{UserID: identity.UserID.String(), Role: identity.Role})
 }
 
+func (s *Server) MeProfile(w http.ResponseWriter, r *http.Request) {
+	identity, ok := IdentityFrom(r.Context())
+	if !ok {
+		writeError(w, domain.ErrInvalidToken)
+		return
+	}
+	view, err := s.user.GetUser(r.Context(), identity.UserID.String())
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, toUserResponse(view))
+}
+
+type updateProfileRequest struct {
+	FirstName   string `json:"first_name"`
+	LastName    string `json:"last_name"`
+	Patronymic  string `json:"patronymic,omitempty"`
+	Email       string `json:"email"`
+	PhoneNumber string `json:"phone_number,omitempty"`
+}
+
+func (s *Server) UpdateMyProfile(w http.ResponseWriter, r *http.Request) {
+	identity, ok := IdentityFrom(r.Context())
+	if !ok {
+		writeError(w, domain.ErrInvalidToken)
+		return
+	}
+	var req updateProfileRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, apiError{Code: "INVALID_JSON", Message: "invalid request body"})
+		return
+	}
+	view, err := s.user.UpdateProfile(r.Context(), dto.UpdateProfileInput{
+		UserID:      identity.UserID.String(),
+		FirstName:   req.FirstName,
+		LastName:    req.LastName,
+		Patronymic:  req.Patronymic,
+		Email:       req.Email,
+		PhoneNumber: req.PhoneNumber,
+	})
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, toUserResponse(view))
+}
+
+type changePasswordRequest struct {
+	OldPassword string `json:"old_password"`
+	NewPassword string `json:"new_password"`
+}
+
+func (s *Server) ChangeMyPassword(w http.ResponseWriter, r *http.Request) {
+	identity, ok := IdentityFrom(r.Context())
+	if !ok {
+		writeError(w, domain.ErrInvalidToken)
+		return
+	}
+	var req changePasswordRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, apiError{Code: "INVALID_JSON", Message: "invalid request body"})
+		return
+	}
+	if err := s.user.ChangePassword(r.Context(), dto.ChangePasswordInput{
+		UserID:      identity.UserID.String(),
+		OldPassword: req.OldPassword,
+		NewPassword: req.NewPassword,
+	}); err != nil {
+		writeError(w, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
 func toUserResponse(v dto.UserView) userResponse {
 	resp := userResponse{
 		ID:          v.ID,

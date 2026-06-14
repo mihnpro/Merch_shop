@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -17,6 +18,14 @@ type ListUsersFilter struct {
 	PageToken string
 }
 
+type ProfileUpdate struct {
+	FirstName   string
+	LastName    string
+	Patronymic  string
+	Email       string
+	PhoneNumber string
+}
+
 type UserRepository interface {
 	CreateUser(ctx context.Context, u *model.User) (uuid.UUID, error)
 	GetUserByLogin(ctx context.Context, login vo.Login) (*model.User, error)
@@ -24,6 +33,8 @@ type UserRepository interface {
 	ExistsByLogin(ctx context.Context, login vo.Login) (bool, error)
 	UpdateUserStatus(ctx context.Context, id uuid.UUID, status vo.Status) (*model.User, error)
 	UpdateUserRole(ctx context.Context, id uuid.UUID, role vo.Role) (*model.User, error)
+	UpdateUserProfile(ctx context.Context, id uuid.UUID, p ProfileUpdate) (*model.User, error)
 	UpdatePassword(ctx context.Context, id uuid.UUID, hash vo.PasswordHash) error
 	ListUsers(ctx context.Context, f ListUsersFilter) ([]*model.User, string, error)
+	CountUsersCreatedSince(ctx context.Context, since time.Time) (int, error)
 }

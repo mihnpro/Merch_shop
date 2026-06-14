@@ -3,6 +3,7 @@ package rest
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 
 	"github.com/mihnpro/Merch_shop/services/invetory/internal/app/dto"
 )
@@ -43,6 +44,42 @@ func (s *Server) ListStock(w http.ResponseWriter, r *http.Request) {
 			Available: v.Available,
 			Version:   v.Version,
 		})
+	}
+	writeJSON(w, http.StatusOK, listStockResponse{Items: items})
+}
+
+func (s *Server) GetStock(w http.ResponseWriter, r *http.Request) {
+	raw := r.URL.Query().Get("product_ids")
+	ids := make([]string, 0)
+	for _, part := range strings.Split(raw, ",") {
+		if p := strings.TrimSpace(part); p != "" {
+			ids = append(ids, p)
+		}
+	}
+	if len(ids) == 0 {
+		writeJSON(w, http.StatusBadRequest, apiError{Code: "INVALID_ARGUMENT", Message: "product_ids required"})
+		return
+	}
+
+	views, err := s.read.ListStockByIDs(r.Context(), ids)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+
+	available := make(map[string]int, len(views))
+	for _, v := range views {
+		available[v.ProductID] = v.Available
+	}
+
+	items := make([]stockItemResponse, 0, len(ids))
+	seen := make(map[string]bool, len(ids))
+	for _, id := range ids {
+		if seen[id] {
+			continue
+		}
+		seen[id] = true
+		items = append(items, stockItemResponse{ProductID: id, Available: available[id]})
 	}
 	writeJSON(w, http.StatusOK, listStockResponse{Items: items})
 }

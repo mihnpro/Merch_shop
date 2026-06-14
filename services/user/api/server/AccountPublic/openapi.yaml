@@ -130,6 +130,61 @@ paths:
         "401":
           $ref: "#/components/responses/Unauthorized"
 
+  /me/profile:
+    get:
+      tags: [profile]
+      summary: Полный профиль текущего пользователя
+      responses:
+        "200":
+          description: Профиль
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    put:
+      tags: [profile]
+      summary: Редактирование собственных данных профиля
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateProfileRequest"
+      responses:
+        "200":
+          description: Обновлённый профиль
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /me/password:
+    post:
+      tags: [profile]
+      summary: Смена собственного пароля
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChangePasswordRequest"
+      responses:
+        "204":
+          description: Пароль изменён
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          description: Неверен старый пароль или сессия
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
   /me/balance:
     get:
       tags: [profile]
@@ -180,6 +235,24 @@ paths:
                 $ref: "#/components/schemas/ListUsersResponse"
         "400":
           $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /admin/users/stats:
+    get:
+      tags: [admin]
+      summary: Статистика пользователей за период (новые сотрудники)
+      parameters:
+        - $ref: "#/components/parameters/Period"
+      responses:
+        "200":
+          description: Статистика
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UsersStatsResponse"
         "401":
           $ref: "#/components/responses/Unauthorized"
         "403":
@@ -357,6 +430,11 @@ components:
       in: query
       schema: { type: string }
       description: Токен следующей страницы; пусто, если страница последняя
+    Period:
+      name: period
+      in: query
+      schema: { type: string, enum: [day, week, month], default: day }
+      description: Период агрегации; по умолчанию day
 
   responses:
     BadRequest:
@@ -503,6 +581,30 @@ components:
       type: object
       properties:
         new_password: { type: string }
+
+    UpdateProfileRequest:
+      type: object
+      required: [first_name, last_name, email]
+      properties:
+        first_name: { type: string }
+        last_name: { type: string }
+        patronymic: { type: string }
+        email: { type: string, format: email }
+        phone_number: { type: string }
+
+    ChangePasswordRequest:
+      type: object
+      required: [old_password, new_password]
+      properties:
+        old_password: { type: string }
+        new_password: { type: string, minLength: 8 }
+
+    UsersStatsResponse:
+      type: object
+      properties:
+        new_users:
+          type: integer
+          description: Число пользователей, зарегистрированных за период
 
     Error:
       type: object

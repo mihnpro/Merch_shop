@@ -14,6 +14,7 @@ import (
 type InventoryReadService interface {
 	CheckStock(ctx context.Context, in dto.CheckStockInput) (dto.CheckStockView, error)
 	ListStock(ctx context.Context) ([]dto.StockView, error)
+	ListStockByIDs(ctx context.Context, ids []string) ([]dto.StockView, error)
 }
 
 type inventoryReadService struct {
@@ -48,6 +49,29 @@ func (s *inventoryReadService) CheckStock(ctx context.Context, in dto.CheckStock
 		Available: st.Available,
 		InStock:   st.Available >= need,
 	}, nil
+}
+
+func (s *inventoryReadService) ListStockByIDs(ctx context.Context, ids []string) ([]dto.StockView, error) {
+	parsed := make([]uuid.UUID, 0, len(ids))
+	for _, raw := range ids {
+		id, err := uuid.Parse(raw)
+		if err != nil {
+			continue
+		}
+		parsed = append(parsed, id)
+	}
+	if len(parsed) == 0 {
+		return []dto.StockView{}, nil
+	}
+	stocks, err := s.stock.GetByProductIDs(ctx, parsed)
+	if err != nil {
+		return nil, err
+	}
+	views := make([]dto.StockView, 0, len(stocks))
+	for _, st := range stocks {
+		views = append(views, dto.ToStockView(st))
+	}
+	return views, nil
 }
 
 func (s *inventoryReadService) ListStock(ctx context.Context) ([]dto.StockView, error) {
