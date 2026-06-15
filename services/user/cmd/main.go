@@ -85,7 +85,7 @@ func main() {
 	readSvc := query.NewAuthReadService(userRepo)
 	authSvc := service.NewAuthService(userRepo, readSvc, acct, tokenStore, refreshTokenTTL)
 	userSvc := service.NewUserService(userRepo, balanceRepo, pointsMgr, acct)
-	adminSvc := service.NewAdminService(userRepo, balanceRepo, pointsMgr, acct)
+	adminSvc := service.NewAdminService(userRepo, balanceRepo, pointsMgr, acct, tokenStore)
 
 	grpcSrv := grpctransport.NewGRPCServer(authSvc, userSvc, adminSvc)
 
