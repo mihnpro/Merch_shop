@@ -61,7 +61,7 @@ func (s *orderService) CreateOrder(ctx context.Context, in dto.CreateOrderInput)
 		})
 	}
 
-	order, err := model.NewOrder(userID, orderItems, in.DeliveryAddress)
+	order, err := model.NewOrder(userID, orderItems, in.DeliveryAddress, in.Note)
 	if err != nil {
 		return dto.OrderView{}, err
 	}
@@ -137,7 +137,7 @@ func (s *orderService) UpdateOrderStatus(ctx context.Context, in dto.UpdateOrder
 		return dto.OrderView{}, err
 	}
 
-	if err := s.orders.UpdateOrderStatus(ctx, id, newStatus); err != nil {
+	if err := s.orders.UpdateOrderStatus(ctx, id, newStatus, in.Reason); err != nil {
 		return dto.OrderView{}, err
 	}
 	
