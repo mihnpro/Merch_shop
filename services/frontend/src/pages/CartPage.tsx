@@ -14,6 +14,7 @@ export default function CartPage() {
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [address, setAddress] = useState("");
+  const [note, setNote] = useState("");
   const [balance, setBalance] = useState<number | null>(null);
 
   useEffect(() => {
@@ -86,7 +87,7 @@ export default function CartPage() {
     setBusy("checkout");
     setError("");
     try {
-      const order = await createOrder(delivery);
+      const order = await createOrder(delivery, note.trim() || undefined);
       await refresh();
       navigate(`/order/${order.id}`);
     } catch (e) {
@@ -234,6 +235,16 @@ export default function CartPage() {
                 onChange={(e) => setAddress(e.target.value)}
                 placeholder="Город, улица, дом, квартира"
                 disabled={!!busy}
+              />
+            </label>
+            <label>
+              Заметки к заказу (не обязательно)
+              <textarea
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+                placeholder="Добавьте пожелания, инструкции или комментарии..."
+                disabled={!!busy}
+                rows={3}
               />
             </label>
           </div>

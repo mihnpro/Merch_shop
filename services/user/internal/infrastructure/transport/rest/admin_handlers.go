@@ -68,7 +68,6 @@ func toListUsersResponse(views []dto.UserView, nextToken string) listUsersRespon
 	return listUsersResponse{Users: users, NextPageToken: nextToken}
 }
 
-// ─── Balance (self) ───────────────────────────────────────────────────────────
 
 func (s *Server) GetMyBalance(w http.ResponseWriter, r *http.Request) {
 	identity, ok := IdentityFrom(r.Context())
@@ -173,7 +172,16 @@ type blockUserRequest struct {
 }
 
 func (s *Server) AdminBlockUser(w http.ResponseWriter, r *http.Request) {
+	identity, ok := IdentityFrom(r.Context())
+	if !ok {
+		writeError(w, domain.ErrInvalidToken)
+		return
+	}
 	userID := r.PathValue("id")
+	if identity.UserID.String() == userID {
+		writeError(w, domain.ErrForbidden)
+		return
+	}
 	var req blockUserRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeJSON(w, http.StatusBadRequest, apiError{Code: "INVALID_JSON", Message: "invalid request body"})
@@ -192,7 +200,16 @@ type changeRoleRequest struct {
 }
 
 func (s *Server) AdminChangeRole(w http.ResponseWriter, r *http.Request) {
+	identity, ok := IdentityFrom(r.Context())
+	if !ok {
+		writeError(w, domain.ErrInvalidToken)
+		return
+	}
 	userID := r.PathValue("id")
+	if identity.UserID.String() == userID {
+		writeError(w, domain.ErrForbidden)
+		return
+	}
 	var req changeRoleRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeJSON(w, http.StatusBadRequest, apiError{Code: "INVALID_JSON", Message: "invalid request body"})

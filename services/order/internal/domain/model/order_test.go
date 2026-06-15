@@ -18,7 +18,7 @@ func sampleItems() []OrderItem {
 
 func TestNewOrder_ComputesTotalAndDefaults(t *testing.T) {
 	userID := uuid.New()
-	order, err := NewOrder(userID, sampleItems(), "Main St 1")
+	order, err := NewOrder(userID, sampleItems(), "Main St 1", nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -55,7 +55,7 @@ func TestNewOrder_Invalid(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			if _, err := NewOrder(uuid.New(), tc.items, tc.address); !errors.Is(err, tc.want) {
+			if _, err := NewOrder(uuid.New(), tc.items, tc.address, nil); !errors.Is(err, tc.want) {
 				t.Errorf("err = %v, want %v", err, tc.want)
 			}
 		})
@@ -63,7 +63,7 @@ func TestNewOrder_Invalid(t *testing.T) {
 }
 
 func TestTransitionTo(t *testing.T) {
-	order, _ := NewOrder(uuid.New(), sampleItems(), "Main St")
+	order, _ := NewOrder(uuid.New(), sampleItems(), "Main St", nil)
 
 	if err := order.TransitionTo(StatusConfirmed); err != nil {
 		t.Fatalf("pending->confirmed should be allowed: %v", err)

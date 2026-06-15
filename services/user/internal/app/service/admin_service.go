@@ -29,10 +29,11 @@ type adminService struct {
 	balance repository.BalanceRepository
 	points  *domainsvc.PointsManager
 	account port.Account
+	tokens  port.TokenStore
 }
 
-func NewAdminService(users repository.UserRepository, balance repository.BalanceRepository, points *domainsvc.PointsManager, account port.Account) AdminService {
-	return &adminService{users: users, balance: balance, points: points, account: account}
+func NewAdminService(users repository.UserRepository, balance repository.BalanceRepository, points *domainsvc.PointsManager, account port.Account, tokens port.TokenStore) AdminService {
+	return &adminService{users: users, balance: balance, points: points, account: account, tokens: tokens}
 }
 
 func (s *adminService) GrantPoints(ctx context.Context, in dto.GrantPointsInput) (dto.BalanceView, error) {
@@ -96,6 +97,9 @@ func (s *adminService) BlockUser(ctx context.Context, userID string, blocked boo
 	u, err := s.users.UpdateUserStatus(ctx, id, status)
 	if err != nil {
 		return dto.UserView{}, err
+	}
+	if blocked {
+		_ = s.tokens.DeleteByUserID(ctx, userID)
 	}
 	return toUserView(u), nil
 }

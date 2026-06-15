@@ -125,6 +125,16 @@ func (s *Server) Me(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	view, err := s.user.GetUser(r.Context(), identity.UserID.String())
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	if view.Status == "blocked" {
+		writeError(w, domain.ErrUserBlocked)
+		return
+	}
+
 	writeJSON(w, http.StatusOK, meResponse{UserID: identity.UserID.String(), Role: identity.Role})
 }
 

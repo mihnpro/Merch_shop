@@ -71,8 +71,8 @@ func (r *orderRepository) GetOrderByID(ctx context.Context, id uuid.UUID) (*mode
 	return toOrderModel(row, itemRows), nil
 }
 
-func (r *orderRepository) UpdateOrderStatus(ctx context.Context, id uuid.UUID, status model.OrderStatus) error {
-	return updateOrderStatus(ctx, r.db, id, status)
+func (r *orderRepository) UpdateOrderStatus(ctx context.Context, id uuid.UUID, status model.OrderStatus, reason string) error {
+	return updateOrderStatus(ctx, r.db, id, status, reason)
 }
 
 func (r *orderRepository) GetAnalytics(ctx context.Context, since time.Time) (repository.Analytics, error) {

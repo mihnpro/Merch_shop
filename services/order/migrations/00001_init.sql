@@ -18,6 +18,8 @@ CREATE TABLE orders (
     user_id          UUID         NOT NULL,
     total_points     BIGINT       NOT NULL CHECK (total_points > 0),
     status           order_status NOT NULL DEFAULT 'pending',
+    note             TEXT         CHECK (note IS NULL OR length(note) <= 1000),
+    cancel_reason    TEXT         CHECK (cancel_reason IS NULL OR length(cancel_reason) <= 1000),
     delivery_address TEXT         NOT NULL CHECK (length(delivery_address) > 0),
     created_at       TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
     updated_at       TIMESTAMPTZ  NOT NULL DEFAULT NOW()
