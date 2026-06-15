@@ -6,6 +6,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { useLocation } from "react-router-dom";
 import { getMe } from "../api/auth";
 import type { Role } from "../api/types";
 
@@ -28,6 +29,7 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 const ANONYMOUS: AuthState = { status: "anonymous", role: null, userId: null };
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const location = useLocation();
   const [state, setState] = useState<AuthState>({
     status: "loading",
     role: null,
@@ -48,6 +50,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     void refresh();
   }, [refresh]);
+
+  useEffect(() => {
+    void refresh();
+  }, [location.pathname]);
 
   const value: AuthContextValue = {
     ...state,
