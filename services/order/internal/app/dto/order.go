@@ -15,6 +15,8 @@ type OrderView struct {
 	UserID          string          `json:"user_id"`
 	Status          string          `json:"status"`
 	TotalPoints     int64           `json:"total_points"`
+	Note            *string         `json:"note,omitempty"`
+	CancelReason    *string         `json:"cancel_reason,omitempty"`
 	DeliveryAddress string          `json:"delivery_address"`
 	Items           []OrderItemView `json:"items"`
 	CreatedAt       time.Time       `json:"created_at"`
@@ -24,6 +26,7 @@ type OrderView struct {
 type CreateOrderInput struct {
 	UserID          string
 	DeliveryAddress string
+	Note            *string
 }
 
 type UpdateOrderStatusInput struct {

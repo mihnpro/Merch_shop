@@ -40,6 +40,9 @@ async function parseResponse<T>(response: Response): Promise<T> {
   const data = text ? JSON.parse(text) : undefined;
 
   if (!response.ok) {
+    if (response.status === 403 && data?.code === "USER_BLOCKED") {
+      throw new Error("Ваш аккаунт заблокирован");
+    }
     const message = data?.message ?? `Ошибка запроса (${response.status})`;
     throw new Error(message);
   }

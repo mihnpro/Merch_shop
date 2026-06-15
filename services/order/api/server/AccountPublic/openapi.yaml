@@ -265,6 +265,11 @@ components:
           type: integer
           format: int64
           description: Итоговая сумма заказа в баллах
+        note:
+          type: string
+          nullable: true
+          maxLength: 1000
+          description: Опциональная заметка пользователя к заказу
         delivery_address: { type: string }
         items:
           type: array
@@ -279,9 +284,12 @@ components:
         delivery_address:
           type: string
           minLength: 1
-          description: >-
-            Адрес доставки. Состав и сумма заказа берутся из корзины на сервере.
-
+          description: Адрес доставки. Состав и сумма заказа берутся из корзины на сервере.
+        note:
+          type: string
+          maxLength: 1000
+          nullable: true
+          description: Опциональная заметка к заказу (например, инструкции по доставке)
     UpdateStatusRequest:
       type: object
       required: [status]

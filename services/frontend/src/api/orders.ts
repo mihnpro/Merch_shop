@@ -1,10 +1,10 @@
 import { request } from "./client";
 import type { ListOrdersParams, ListOrdersResponse, OrderView } from "./types";
 
-export function createOrder(delivery_address: string): Promise<OrderView> {
+export function createOrder(delivery_address: string, note?: string): Promise<OrderView> {
   return request<OrderView>("/orders", {
     method: "POST",
-    body: JSON.stringify({ delivery_address }),
+    body: JSON.stringify({ delivery_address, note }),
   });
 }
 

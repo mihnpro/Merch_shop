@@ -16,15 +16,21 @@ func (s *Server) CreateOrder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var body struct {
-		DeliveryAddress string `json:"delivery_address"`
+		DeliveryAddress string  `json:"delivery_address"`
+		Note            *string `json:"note"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.DeliveryAddress == "" {
+		writeError(w, domain.ErrInvalidInput)
+		return
+	}
+	if body.Note != nil && len(*body.Note) > 1000 {
 		writeError(w, domain.ErrInvalidInput)
 		return
 	}
 	view, err := s.orders.CreateOrder(r.Context(), dto.CreateOrderInput{
 		UserID:          identity.UserID.String(),
 		DeliveryAddress: body.DeliveryAddress,
+		Note:            body.Note,
 	})
 	if err != nil {
 		writeError(w, err)

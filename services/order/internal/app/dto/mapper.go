@@ -18,6 +18,8 @@ func ToOrderView(o *model.Order) OrderView {
 		UserID:          o.UserID.String(),
 		Status:          string(o.Status),
 		TotalPoints:     o.TotalPoints,
+		Note:            o.Note,
+		CancelReason:    o.CancelReason,
 		DeliveryAddress: o.DeliveryAddress,
 		Items:           items,
 		CreatedAt:       o.CreatedAt,

@@ -99,6 +99,10 @@ func (s *authService) Login(ctx context.Context, in dto.LoginInput) (dto.AuthRes
 		return dto.AuthResult{}, domain.ErrInvalidCredentials
 	}
 
+	if user.Status.IsBlocked() {
+		return dto.AuthResult{}, domain.ErrUserBlocked
+	}
+
 	tokens, err := s.account.GenerateTokens(user.Identity())
 	if err != nil {
 		return dto.AuthResult{}, err
@@ -155,6 +159,13 @@ func (s *authService) Me(ctx context.Context, accessToken string) (dto.Me, error
 	identity, err := s.account.ValidateToken(accessToken)
 	if err != nil {
 		return dto.Me{}, err
+	}
+	user, err := s.users.GetUserByID(ctx, identity.UserID)
+	if err != nil {
+		return dto.Me{}, err
+	}
+	if user.Status.IsBlocked() {
+		return dto.Me{}, domain.ErrUserBlocked
 	}
 	return dto.Me{UserID: identity.UserID.String(), Role: identity.Role}, nil
 }

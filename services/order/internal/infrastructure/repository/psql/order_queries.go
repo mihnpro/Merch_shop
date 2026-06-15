@@ -22,6 +22,8 @@ type orderRow struct {
 	UserID          uuid.UUID `db:"user_id"`
 	TotalPoints     int64     `db:"total_points"`
 	Status          string    `db:"status"`
+	Note            *string   `db:"note"`
+	CancelReason    *string   `db:"cancel_reason"`
 	DeliveryAddress string    `db:"delivery_address"`
 	CreatedAt       time.Time `db:"created_at"`
 	UpdatedAt       time.Time `db:"updated_at"`
@@ -40,10 +42,10 @@ type orderItemRow struct {
 
 func insertOrder(ctx context.Context, exec sqlx.ExecerContext, order *model.Order) error {
 	_, err := exec.ExecContext(ctx,
-		`INSERT INTO orders (id, user_id, total_points, status, delivery_address, created_at, updated_at)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+		`INSERT INTO orders (id, user_id, total_points, status, note, delivery_address, created_at, updated_at)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
 		order.ID, order.UserID, order.TotalPoints, string(order.Status),
-		order.DeliveryAddress, order.CreatedAt, order.UpdatedAt,
+		order.Note, order.DeliveryAddress, order.CreatedAt, order.UpdatedAt,
 	)
 	if err != nil {
 		return fmt.Errorf("insert order: %w", err)
@@ -68,7 +70,7 @@ func insertOrderItems(ctx context.Context, exec sqlx.ExecerContext, items []mode
 func getOrderRow(ctx context.Context, q sqlx.QueryerContext, id uuid.UUID) (*orderRow, error) {
 	var row orderRow
 	err := sqlx.GetContext(ctx, q, &row,
-		`SELECT id, user_id, total_points, status, delivery_address, created_at, updated_at
+		`SELECT id, user_id, total_points, status, note, cancel_reason, delivery_address, created_at, updated_at
 		 FROM orders WHERE id = $1`, id)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -89,10 +91,18 @@ func selectOrderItems(ctx context.Context, q sqlx.QueryerContext, orderID uuid.U
 	return itemRows, nil
 }
 
-func updateOrderStatus(ctx context.Context, exec sqlx.ExecerContext, id uuid.UUID, status model.OrderStatus) error {
-	res, err := exec.ExecContext(ctx,
-		`UPDATE orders SET status = $1, updated_at = NOW() WHERE id = $2`,
-		string(status), id)
+func updateOrderStatus(ctx context.Context, exec sqlx.ExecerContext, id uuid.UUID, status model.OrderStatus, reason string) error {
+	var res sql.Result
+	var err error
+	if reason != "" {
+		res, err = exec.ExecContext(ctx,
+			`UPDATE orders SET status = $1, cancel_reason = $2, updated_at = NOW() WHERE id = $3`,
+			string(status), reason, id)
+	} else {
+		res, err = exec.ExecContext(ctx,
+			`UPDATE orders SET status = $1, updated_at = NOW() WHERE id = $2`,
+			string(status), id)
+	}
 	if err != nil {
 		return err
 	}
@@ -129,7 +139,7 @@ func selectOrdersPage(ctx context.Context, db *sqlx.DB, f repository.ListOrdersF
 
 	args = append(args, pageSize+1)
 	q := fmt.Sprintf(
-		`SELECT id, user_id, total_points, status, delivery_address, created_at, updated_at
+		`SELECT id, user_id, total_points, status, note, cancel_reason, delivery_address, created_at, updated_at
 		 FROM orders o
 		 WHERE %s
 		 ORDER BY o.created_at DESC, o.id DESC
@@ -237,6 +247,8 @@ func toOrderModel(row *orderRow, itemRows []orderItemRow) *model.Order {
 		UserID:          row.UserID,
 		TotalPoints:     row.TotalPoints,
 		Status:          model.OrderStatus(row.Status),
+		Note:            row.Note,
+		CancelReason:    row.CancelReason,
 		DeliveryAddress: row.DeliveryAddress,
 		Items:           items,
 		CreatedAt:       row.CreatedAt,
