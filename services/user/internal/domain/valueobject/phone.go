@@ -7,7 +7,7 @@ import (
 	"github.com/mihnpro/Merch_shop/services/user_customer/internal/domain"
 )
 
-var phoneRegex = regexp.MustCompile(`^\+?[0-9]{10,15}$`)
+var phoneRegex = regexp.MustCompile(`^\+?[1-9][0-9]{6,14}$`)
 
 type PhoneNumber struct {
 	value string
