@@ -208,6 +208,8 @@ export interface OrderView {
   user_id: string;
   status: OrderStatus;
   total_points: number;
+  note?: string;
+  cancel_reason?: string;
   delivery_address: string;
   items: OrderItemView[];
   created_at: string;
