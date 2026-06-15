@@ -228,6 +228,20 @@ function OrderRow({
             <p>
               <strong>Адрес доставки:</strong> {order.delivery_address}
             </p>
+            {order.note && (
+              <p>
+                <strong>Заметки:</strong>
+                <div style={{ whiteSpace: "pre-wrap", marginTop: 4, padding: 8, backgroundColor: "#f5f5f5", borderRadius: 4 }}>
+                  {order.note}
+                </div>
+              </p>
+            )}
+            {order.status === "cancelled" && order.cancel_reason && (
+              <p>
+                <strong>Причина отмены:</strong>{" "}
+                <span style={{ whiteSpace: "pre-wrap" }}>{order.cancel_reason}</span>
+              </p>
+            )}
             <div className="table-wrap">
               <table className="table">
                 <thead>

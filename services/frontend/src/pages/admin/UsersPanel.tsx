@@ -8,8 +8,10 @@ import {
   resetUserPassword,
 } from "../../api/admin";
 import type { AdminUser, Transaction } from "../../api/types";
+import { useAuth } from "../../lib/AuthContext";
 
 export default function UsersPanel() {
+  const { userId } = useAuth();
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [search, setSearch] = useState("");
   const [error, setError] = useState("");
@@ -76,6 +78,7 @@ export default function UsersPanel() {
               <UserRow
                 key={u.id}
                 user={u}
+                currentUserId={userId}
                 open={openId === u.id}
                 onToggle={() => setOpenId(openId === u.id ? null : u.id)}
                 onUpdated={replaceUser}
@@ -92,6 +95,7 @@ export default function UsersPanel() {
 
 function UserRow({
   user,
+  currentUserId,
   open,
   onToggle,
   onUpdated,
@@ -99,6 +103,7 @@ function UserRow({
   onError,
 }: {
   user: AdminUser;
+  currentUserId: string | null;
   open: boolean;
   onToggle: () => void;
   onUpdated: (user: AdminUser) => void;
@@ -192,10 +197,10 @@ function UserRow({
         <tr>
           <td colSpan={6}>
             <div className="actions" style={{ marginBottom: 12, flexWrap: "wrap" }}>
-              <button type="button" className="btn-secondary" disabled={busy} onClick={handleBlock}>
+              <button type="button" className="btn-secondary" disabled={busy || user.id === currentUserId} onClick={handleBlock}>
                 {blocked ? "Разблокировать" : "Заблокировать"}
               </button>
-              <button type="button" className="btn-secondary" disabled={busy} onClick={handleRole}>
+              <button type="button" className="btn-secondary" disabled={busy || user.id === currentUserId} onClick={handleRole}>
                 {user.role === "admin" ? "Снять админа" : "Сделать админом"}
               </button>
               <button type="button" className="btn-secondary" disabled={busy} onClick={handleReset}>
