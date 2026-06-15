@@ -43,6 +43,8 @@ type Order struct {
 	Items           []OrderItem
 	TotalPoints     int64
 	Status          OrderStatus
+	Note            *string
+	CancelReason    *string
 	DeliveryAddress string
 	CreatedAt       time.Time
 	UpdatedAt       time.Time
@@ -57,7 +59,7 @@ type OrderItem struct {
 	PricePoints int64
 }
 
-func NewOrder(userID uuid.UUID, items []OrderItem, deliveryAddress string) (*Order, error) {
+func NewOrder(userID uuid.UUID, items []OrderItem, deliveryAddress string, note *string) (*Order, error) {
 	if deliveryAddress == "" {
 		return nil, domain.ErrInvalidInput
 	}
@@ -87,6 +89,7 @@ func NewOrder(userID uuid.UUID, items []OrderItem, deliveryAddress string) (*Ord
 		Items:           items,
 		TotalPoints:     total,
 		Status:          StatusPending,
+		Note:            note,
 		DeliveryAddress: deliveryAddress,
 		CreatedAt:       now,
 		UpdatedAt:       now,
