@@ -103,6 +103,20 @@ export default function OrderStatusPage() {
           <p>
             <strong>Адрес доставки:</strong> {order.delivery_address}
           </p>
+          {order.note && (
+            <p>
+              <strong>Ваши заметки:</strong>
+              <div style={{ whiteSpace: "pre-wrap", marginTop: 4, padding: 8, backgroundColor: "#f5f5f5", borderRadius: 4 }}>
+                {order.note}
+              </div>
+            </p>
+          )}
+          {order.status === "cancelled" && order.cancel_reason && (
+            <p>
+              <strong>Причина отмены:</strong>{" "}
+              <span style={{ whiteSpace: "pre-wrap" }}>{order.cancel_reason}</span>
+            </p>
+          )}
           <div className="cart-total">
             Итого: <strong>{order.total_points} баллов</strong>
           </div>
