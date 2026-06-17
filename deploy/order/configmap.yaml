@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: order-config
+  namespace: merchshop
+  labels:
+    app: order
+data:
+  POSTGRES_HOST: "host.minikube.internal"
+  POSTGRES_PORT: "5433"
+  POSTGRES_USER: "postgres"
+  POSTGRES_DB: "merch_order"
+  POSTGRES_SSLMODE: "disable"
+  GRPC_PORT: "50056"
+  HTTP_PORT: "8086"
+  KAFKA_BROKERS: "host.minikube.internal:9092"
+  CART_SERVICE_ADDR: "cart:50055"
+  USER_SERVICE_ADDR: "user:50051"
+  INVENTORY_SERVICE_ADDR: "inventory:50051"

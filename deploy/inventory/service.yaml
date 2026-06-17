@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: inventory
+  namespace: merchshop
+  labels:
+    app: inventory
+spec:
+  type: ClusterIP
+  selector:
+    app: inventory
+  ports:
+    - name: http
+      port: 8084
+      targetPort: 8084
+    - name: grpc
+      port: 50051
+      targetPort: 50051
