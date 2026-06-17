@@ -1,0 +1,331 @@
+version: '3'
+
+# MerchShop — сборка и запуск docker compose сервисов.
+#
+# Активные сервисы: user, products, media, inventory, cart, order, gateway, frontend.
+# ВАЖНО: products / media / inventory / cart / gateway используют внешнюю docker-сеть
+# `user_default`, которую создаёт проект `user`, поэтому `user`
+# всегда поднимается первым. Каждый сервис подхватывает свой .env
+# из собственной папки автоматически.
+# Примечание: каталог сервиса inventory называется `invetory` (исторически),
+# поэтому задачи `inventory:*` указывают на services/invetory.
+
+vars:
+  COMPOSE: docker compose
+
+tasks:
+  default:
+    desc: Список доступных команд
+    cmds:
+      - task --list
+    silent: true
+
+  # ============================================================
+  #  Все сервисы сразу
+  # ============================================================
+  up:
+    desc: Собрать и поднять ВСЕ сервисы (в правильном порядке)
+    cmds:
+      - task: user:up
+      - task: products:up
+      - task: media:up
+      - task: inventory:up
+      - task: cart:up
+      - task: order:up
+      - task: gateway:up
+      - task: frontend:up
+
+  down:
+    desc: Остановить ВСЕ сервисы (обратный порядок)
+    cmds:
+      - task: frontend:down
+      - task: gateway:down
+      - task: order:down
+      - task: cart:down
+      - task: inventory:down
+      - task: media:down
+      - task: products:down
+      - task: user:down
+
+  build:
+    desc: Собрать образы ВСЕХ сервисов
+    cmds:
+      - task: user:build
+      - task: products:build
+      - task: media:build
+      - task: inventory:build
+      - task: cart:build
+      - task: order:build
+      - task: gateway:build
+      - task: frontend:build
+
+  rebuild:
+    desc: Полный ребилд (--no-cache) и перезапуск ВСЕХ сервисов
+    cmds:
+      - task: down
+      - task: user:rebuild
+      - task: products:rebuild
+      - task: media:rebuild
+      - task: inventory:rebuild
+      - task: cart:rebuild
+      - task: order:rebuild
+      - task: gateway:rebuild
+      - task: frontend:rebuild
+
+  ps:
+    desc: Статус контейнеров всех сервисов
+    cmds:
+      - for: [user, products, media, invetory, cart, order, gateway, frontend]
+        task: _ps
+        vars: { SVC: '{{.ITEM}}' }
+
+  # ============================================================
+  #  user
+  # ============================================================
+  user:build:   { desc: 'Собрать образ user',            cmds: [{ task: _build,   vars: { SVC: user } }] }
+  user:up:      { desc: 'Собрать и поднять user',        cmds: [{ task: _up,      vars: { SVC: user } }] }
+  user:down:    { desc: 'Остановить user',               cmds: [{ task: _down,    vars: { SVC: user } }] }
+  user:rebuild: { desc: 'Ребилд (--no-cache) user',      cmds: [{ task: _rebuild, vars: { SVC: user } }] }
+  user:restart: { desc: 'Перезапустить user',            cmds: [{ task: _restart, vars: { SVC: user } }] }
+  user:logs:    { desc: 'Логи user',                     cmds: [{ task: _logs,    vars: { SVC: user } }] }
+  user:unit:
+    desc: 'Unit-тесты user сервиса'
+    dir: 'services/user'
+    cmds:
+      - go test ./internal/app/service/... ./internal/domain/service/... ./internal/domain/model/... ./internal/app/query/... -v -count=1
+  user:e2e:
+    desc: 'E2E user — auth + me (без admin)'
+    dir: 'services/user'
+    cmds:
+      - sh test/user_e2e.sh
+  user:e2e:admin:
+    desc: 'E2E user — полный (auth + me + admin)'
+    dir: 'services/user'
+    cmds:
+      - sh test/user_e2e.sh
+    env:
+      ADMIN_LOGIN: '{{.ADMIN_LOGIN | default "admin"}}'
+      ADMIN_PASS: '{{.ADMIN_PASS | default "admin"}}'
+  user:e2e:full:
+    desc: 'E2E user — все тесты, admin из .env'
+    dir: 'services/user'
+    cmds:
+      - sh test/user_e2e.sh
+    env:
+      ADMIN_LOGIN: '{{.ADMIN_LOGIN | default ""}}'
+      ADMIN_PASS: '{{.ADMIN_PASS | default ""}}'
+  user:e2e:go:
+    desc: 'E2E user на Go (против поднятого стека, сидит admin в БД)'
+    dir: 'services/user/test'
+    env:
+      GOFLAGS: -mod=mod
+      GOPROXY: 'off'
+      GOTOOLCHAIN: go1.25.10
+    cmds:
+      - go test ./... -v -count=1
+
+  # ============================================================
+  #  products
+  # ============================================================
+  products:build:   { desc: 'Собрать образ products',         cmds: [{ task: _build,   vars: { SVC: products } }] }
+  products:up:      { desc: 'Собрать и поднять products',     cmds: [{ task: _up,      vars: { SVC: products } }] }
+  products:down:    { desc: 'Остановить products',            cmds: [{ task: _down,    vars: { SVC: products } }] }
+  products:rebuild: { desc: 'Ребилд (--no-cache) products',   cmds: [{ task: _rebuild, vars: { SVC: products } }] }
+  products:restart: { desc: 'Перезапустить products',         cmds: [{ task: _restart, vars: { SVC: products } }] }
+  products:logs:    { desc: 'Логи products',                  cmds: [{ task: _logs,    vars: { SVC: products } }] }
+  products:unit:
+    desc: 'Unit-тесты products (app + domain)'
+    dir: 'services/products'
+    env:
+      GOFLAGS: -mod=mod
+      GOPROXY: 'off'
+      GOTOOLCHAIN: go1.25.10
+    cmds:
+      - go test ./internal/app/... ./internal/domain/... -v -count=1
+  products:e2e:go:
+    desc: 'E2E products на Go (против поднятого стека, admin через user-БД)'
+    dir: 'services/products/test'
+    env:
+      GOFLAGS: -mod=mod
+      GOPROXY: 'off'
+      GOTOOLCHAIN: go1.25.10
+    cmds:
+      - go test ./... -v -count=1
+
+  # ============================================================
+  #  media
+  # ============================================================
+  media:build:   { desc: 'Собрать образ media',          cmds: [{ task: _build,   vars: { SVC: media } }] }
+  media:up:      { desc: 'Собрать и поднять media',      cmds: [{ task: _up,      vars: { SVC: media } }] }
+  media:down:    { desc: 'Остановить media',             cmds: [{ task: _down,    vars: { SVC: media } }] }
+  media:rebuild: { desc: 'Ребилд (--no-cache) media',    cmds: [{ task: _rebuild, vars: { SVC: media } }] }
+  media:restart: { desc: 'Перезапустить media',          cmds: [{ task: _restart, vars: { SVC: media } }] }
+  media:logs:    { desc: 'Логи media',                   cmds: [{ task: _logs,    vars: { SVC: media } }] }
+  media:unit:
+    desc: 'Unit-тесты media (app + domain)'
+    dir: 'services/media'
+    env:
+      GOFLAGS: -mod=mod
+      GOPROXY: 'off'
+      GOTOOLCHAIN: go1.25.10
+    cmds:
+      - go test ./internal/... -v -count=1
+  media:e2e:go:
+    desc: 'E2E media на Go (требует MinIO, против поднятого стека)'
+    dir: 'services/media/test'
+    env:
+      GOFLAGS: -mod=mod
+      GOPROXY: 'off'
+      GOTOOLCHAIN: go1.25.10
+    cmds:
+      - go test ./... -v -count=1
+
+  # ============================================================
+  #  inventory  (каталог services/invetory)
+  # ============================================================
+  inventory:build:   { desc: 'Собрать образ inventory',        cmds: [{ task: _build,   vars: { SVC: invetory } }] }
+  inventory:up:      { desc: 'Собрать и поднять inventory',    cmds: [{ task: _up,      vars: { SVC: invetory } }] }
+  inventory:down:    { desc: 'Остановить inventory',           cmds: [{ task: _down,    vars: { SVC: invetory } }] }
+  inventory:rebuild: { desc: 'Ребилд (--no-cache) inventory',  cmds: [{ task: _rebuild, vars: { SVC: invetory } }] }
+  inventory:restart: { desc: 'Перезапустить inventory',        cmds: [{ task: _restart, vars: { SVC: invetory } }] }
+  inventory:logs:    { desc: 'Логи inventory',                 cmds: [{ task: _logs,    vars: { SVC: invetory } }] }
+  inventory:unit:
+    desc: 'Unit-тесты inventory (app + domain + kafka-схема)'
+    dir: 'services/invetory'
+    env:
+      GOFLAGS: -mod=mod
+      GOPROXY: 'off'
+      GOTOOLCHAIN: go1.25.10
+    cmds:
+      - go test ./internal/app/... ./internal/domain/... ./internal/infrastructure/kafka/... -v -count=1
+  inventory:e2e:go:
+    desc: 'E2E inventory на Go (против поднятого стека, admin через user-БД)'
+    dir: 'services/invetory/test'
+    env:
+      GOFLAGS: -mod=mod
+      GOPROXY: 'off'
+      GOTOOLCHAIN: go1.25.10
+    cmds:
+      - go test ./... -v -count=1
+
+  # ============================================================
+  #  cart
+  # ============================================================
+  cart:build:   { desc: 'Собрать образ cart',           cmds: [{ task: _build,   vars: { SVC: cart } }] }
+  cart:up:      { desc: 'Собрать и поднять cart',       cmds: [{ task: _up,      vars: { SVC: cart } }] }
+  cart:down:    { desc: 'Остановить cart',              cmds: [{ task: _down,    vars: { SVC: cart } }] }
+  cart:rebuild: { desc: 'Ребилд (--no-cache) cart',     cmds: [{ task: _rebuild, vars: { SVC: cart } }] }
+  cart:restart: { desc: 'Перезапустить cart',           cmds: [{ task: _restart, vars: { SVC: cart } }] }
+  cart:logs:    { desc: 'Логи cart',                    cmds: [{ task: _logs,    vars: { SVC: cart } }] }
+  cart:unit:
+    desc: 'Unit-тесты cart (app + domain)'
+    dir: 'services/cart'
+    env:
+      GOFLAGS: -mod=mod
+      GOPROXY: 'off'
+      GOTOOLCHAIN: go1.25.10
+    cmds:
+      - go test ./internal/app/... ./internal/domain/... -v -count=1
+  cart:e2e:go:
+    desc: 'E2E cart на Go (через product+inventory, против поднятого стека)'
+    dir: 'services/cart/test'
+    env:
+      GOFLAGS: -mod=mod
+      GOPROXY: 'off'
+      GOTOOLCHAIN: go1.25.10
+    cmds:
+      - go test ./... -v -count=1
+
+  # ============================================================
+  #  order
+  # ============================================================
+  order:build:   { desc: 'Собрать образ order',          cmds: [{ task: _build,   vars: { SVC: order } }] }
+  order:up:      { desc: 'Собрать и поднять order',      cmds: [{ task: _up,      vars: { SVC: order } }] }
+  order:down:    { desc: 'Остановить order',             cmds: [{ task: _down,    vars: { SVC: order } }] }
+  order:rebuild: { desc: 'Ребилд (--no-cache) order',    cmds: [{ task: _rebuild, vars: { SVC: order } }] }
+  order:restart: { desc: 'Перезапустить order',          cmds: [{ task: _restart, vars: { SVC: order } }] }
+  order:logs:    { desc: 'Логи order',                   cmds: [{ task: _logs,    vars: { SVC: order } }] }
+  order:unit:
+    desc: 'Unit-тесты order (app + domain)'
+    dir: 'services/order'
+    env:
+      GOFLAGS: -mod=mod
+      GOPROXY: 'off'
+      GOTOOLCHAIN: go1.25.10
+    cmds:
+      - go test ./internal/app/... ./internal/domain/... -v -count=1
+  order:e2e:go:
+    desc: 'E2E order на Go (полная сага через product+inventory+cart, против поднятого стека)'
+    dir: 'services/order/test'
+    env:
+      GOFLAGS: -mod=mod
+      GOPROXY: 'off'
+      GOTOOLCHAIN: go1.25.10
+    cmds:
+      - go test ./... -v -count=1
+
+  # ============================================================
+  #  gateway
+  # ============================================================
+  gateway:build:   { desc: 'Собрать образ gateway',         cmds: [{ task: _build,   vars: { SVC: gateway } }] }
+  gateway:up:      { desc: 'Собрать и поднять gateway',     cmds: [{ task: _up,      vars: { SVC: gateway } }] }
+  gateway:down:    { desc: 'Остановить gateway',            cmds: [{ task: _down,    vars: { SVC: gateway } }] }
+  gateway:rebuild: { desc: 'Ребилд (--no-cache) gateway',   cmds: [{ task: _rebuild, vars: { SVC: gateway } }] }
+  gateway:restart: { desc: 'Перезапустить gateway',         cmds: [{ task: _restart, vars: { SVC: gateway } }] }
+  gateway:logs:    { desc: 'Логи gateway',                  cmds: [{ task: _logs,    vars: { SVC: gateway } }] }
+
+  # ============================================================
+  #  frontend
+  # ============================================================
+  frontend:build:   { desc: 'Собрать образ frontend',        cmds: [{ task: _build,   vars: { SVC: frontend } }] }
+  frontend:up:      { desc: 'Собрать и поднять frontend',    cmds: [{ task: _up,      vars: { SVC: frontend } }] }
+  frontend:down:    { desc: 'Остановить frontend',           cmds: [{ task: _down,    vars: { SVC: frontend } }] }
+  frontend:rebuild: { desc: 'Ребилд (--no-cache) frontend',  cmds: [{ task: _rebuild, vars: { SVC: frontend } }] }
+  frontend:restart: { desc: 'Перезапустить frontend',        cmds: [{ task: _restart, vars: { SVC: frontend } }] }
+  frontend:logs:    { desc: 'Логи frontend',                 cmds: [{ task: _logs,    vars: { SVC: frontend } }] }
+
+  # ============================================================
+  #  Внутренние помощники (вызываются с vars: SVC)
+  # ============================================================
+  _build:
+    internal: true
+    dir: 'services/{{.SVC}}'
+    cmds:
+      - '{{.COMPOSE}} build'
+
+  _up:
+    internal: true
+    dir: 'services/{{.SVC}}'
+    cmds:
+      - '{{.COMPOSE}} up -d --build'
+
+  _down:
+    internal: true
+    dir: 'services/{{.SVC}}'
+    cmds:
+      - '{{.COMPOSE}} down'
+
+  _rebuild:
+    internal: true
+    dir: 'services/{{.SVC}}'
+    cmds:
+      - '{{.COMPOSE}} build --no-cache'
+      - '{{.COMPOSE}} up -d --force-recreate'
+
+  _restart:
+    internal: true
+    dir: 'services/{{.SVC}}'
+    cmds:
+      - '{{.COMPOSE}} restart'
+
+  _logs:
+    internal: true
+    dir: 'services/{{.SVC}}'
+    cmds:
+      - '{{.COMPOSE}} logs -f'
+
+  _ps:
+    internal: true
+    dir: 'services/{{.SVC}}'
+    cmds:
+      - '{{.COMPOSE}} ps'
