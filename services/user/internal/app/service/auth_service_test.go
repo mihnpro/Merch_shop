@@ -3,7 +3,6 @@ package service
 import (
 	"context"
 	"testing"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -12,202 +11,28 @@ import (
 	"github.com/mihnpro/Merch_shop/services/user_customer/internal/app/port"
 	"github.com/mihnpro/Merch_shop/services/user_customer/internal/domain"
 	"github.com/mihnpro/Merch_shop/services/user_customer/internal/domain/model"
-	"github.com/mihnpro/Merch_shop/services/user_customer/internal/domain/repository"
 	vo "github.com/mihnpro/Merch_shop/services/user_customer/internal/domain/valueobject"
 )
-
-
-type fakeUserRepo struct {
-	existing  map[string]bool 
-	createID  uuid.UUID
-	created   []*model.User
-	existsErr error
-	createErr error
-}
-
-func newFakeUserRepo() *fakeUserRepo {
-	return &fakeUserRepo{existing: make(map[string]bool), createID: uuid.New()}
-}
-
-func (f *fakeUserRepo) CreateUser(ctx context.Context, u *model.User) (uuid.UUID, error) {
-	if f.createErr != nil {
-		return uuid.Nil, f.createErr
-	}
-	f.created = append(f.created, u)
-	return f.createID, nil
-}
-
-func (f *fakeUserRepo) GetUserByLogin(ctx context.Context, login vo.Login) (*model.User, error) {
-	return nil, domain.ErrUserNotFound 
-}
-
-func (f *fakeUserRepo) ExistsByLogin(ctx context.Context, login vo.Login) (bool, error) {
-	if f.existsErr != nil {
-		return false, f.existsErr
-	}
-	return f.existing[login.String()], nil
-}
-
-func (f *fakeUserRepo) GetUserByID(ctx context.Context, id uuid.UUID) (*model.User, error) {
-	return nil, domain.ErrUserNotFound
-}
-
-func (f *fakeUserRepo) UpdateUserStatus(ctx context.Context, id uuid.UUID, status vo.Status) (*model.User, error) {
-	return nil, domain.ErrUserNotFound
-}
-
-func (f *fakeUserRepo) UpdateUserRole(ctx context.Context, id uuid.UUID, role vo.Role) (*model.User, error) {
-	return nil, domain.ErrUserNotFound
-}
-
-func (f *fakeUserRepo) UpdateUserProfile(ctx context.Context, id uuid.UUID, p repository.ProfileUpdate) (*model.User, error) {
-	return nil, domain.ErrUserNotFound
-}
-
-func (f *fakeUserRepo) CountUsersCreatedSince(ctx context.Context, since time.Time) (int, error) {
-	return 0, nil
-}
-
-func (f *fakeUserRepo) UpdatePassword(ctx context.Context, id uuid.UUID, hash vo.PasswordHash) error {
-	return nil
-}
-
-func (f *fakeUserRepo) ListUsers(ctx context.Context, flt repository.ListUsersFilter) ([]*model.User, string, error) {
-	return nil, "", nil
-}
-
-
-type fakeReader struct {
-	users map[string]*model.User
-}
-
-func newFakeReader() *fakeReader {
-	return &fakeReader{users: make(map[string]*model.User)}
-}
-
-func (f *fakeReader) GetUserByLogin(ctx context.Context, login string) (*model.User, error) {
-	u, ok := f.users[login]
-	if !ok {
-		return nil, domain.ErrUserNotFound
-	}
-	return u, nil
-}
-
-
-type fakeAccount struct {
-	verify  bool 
-	tokens  port.TokenPair
-	hashErr error
-	genErr  error
-}
-
-func (f *fakeAccount) HashPassword(p vo.PlainPassword) (vo.PasswordHash, error) {
-	if f.hashErr != nil {
-		return vo.PasswordHash{}, f.hashErr
-	}
-	return vo.NewPasswordHash("hashed:" + p.Reveal()), nil
-}
-
-func (f *fakeAccount) VerifyPassword(p vo.PlainPassword, h vo.PasswordHash) bool { return f.verify }
-
-func (f *fakeAccount) GenerateTokens(id model.Identity) (port.TokenPair, error) {
-	if f.genErr != nil {
-		return port.TokenPair{}, f.genErr
-	}
-	return f.tokens, nil
-}
-
-func (f *fakeAccount) ValidateToken(token string) (model.Identity, error) {
-	return model.Identity{}, nil
-}
-
-
-type fakeTokenStore struct {
-	stored   map[string]string 
-	storeErr error
-}
-
-func newFakeTokenStore() *fakeTokenStore {
-	return &fakeTokenStore{stored: make(map[string]string)}
-}
-
-func (f *fakeTokenStore) Store(ctx context.Context, userID, token string, ttl time.Duration) error {
-	if f.storeErr != nil {
-		return f.storeErr
-	}
-	f.stored[token] = userID
-	return nil
-}
-
-func (f *fakeTokenStore) GetUserID(ctx context.Context, token string) (string, error) {
-	id, ok := f.stored[token]
-	if !ok {
-		return "", domain.ErrInvalidToken
-	}
-	return id, nil
-}
-
-func (f *fakeTokenStore) Delete(ctx context.Context, token string) error {
-	delete(f.stored, token)
-	return nil
-}
-
-func (f *fakeTokenStore) DeleteByUserID(ctx context.Context, userID string) error { return nil }
-
-type harness struct {
-	repo    *fakeUserRepo
-	reader  *fakeReader
-	account *fakeAccount
-	tokens  *fakeTokenStore
-	svc     AuthService
-}
-
-func newHarness() *harness {
-	repo := newFakeUserRepo()
-	reader := newFakeReader()
-	account := &fakeAccount{}
-	tokens := newFakeTokenStore()
-	return &harness{
-		repo:    repo,
-		reader:  reader,
-		account: account,
-		tokens:  tokens,
-		svc:     NewAuthService(repo, reader, account, tokens, time.Hour),
-	}
-}
-
-
-func validRegisterInput() dto.RegisterInput {
-	return dto.RegisterInput{
-		Login:       "testuser",
-		Password:    "password123",
-		FirstName:   "John",
-		LastName:    "Doe",
-		Patronymic:  "Smith",
-		Email:       "john@example.com",
-		PhoneNumber: "+1234567890",
-	}
-}
 
 func TestAuthService_Register(t *testing.T) {
 	t.Run("happy path", func(t *testing.T) {
 		h := newHarness()
-		view, err := h.svc.Register(context.Background(), validRegisterInput())
+		view, err := h.authSvc.Register(context.Background(), validRegisterInput())
 
 		assert.NoError(t, err)
 		assert.Equal(t, "testuser", view.Login)
 		assert.Equal(t, "john@example.com", view.Email)
 		assert.Equal(t, h.repo.createID.String(), view.ID)
-		assert.Len(t, h.repo.created, 1) 
+		assert.Len(t, h.repo.created, 1)
 	})
 
 	t.Run("duplicate login", func(t *testing.T) {
 		h := newHarness()
 		h.repo.existing["testuser"] = true
 
-		_, err := h.svc.Register(context.Background(), validRegisterInput())
+		_, err := h.authSvc.Register(context.Background(), validRegisterInput())
 		assert.ErrorIs(t, err, domain.ErrUserAlreadyExists)
-		assert.Empty(t, h.repo.created) 
+		assert.Empty(t, h.repo.created)
 	})
 
 	t.Run("validation errors", func(t *testing.T) {
@@ -229,7 +54,7 @@ func TestAuthService_Register(t *testing.T) {
 				in := validRegisterInput()
 				tt.mutate(&in)
 
-				_, err := h.svc.Register(context.Background(), in)
+				_, err := h.authSvc.Register(context.Background(), in)
 				assert.ErrorIs(t, err, tt.wantErr)
 				assert.Empty(t, h.repo.created)
 			})
@@ -238,57 +63,65 @@ func TestAuthService_Register(t *testing.T) {
 }
 
 func TestAuthService_Login(t *testing.T) {
-
-	seedUser := func(h *harness) *model.User {
-		u := &model.User{
-			ID:           uuid.New(),
-			Login:        vo.NewLoginFromStored("testuser"),
-			PasswordHash: vo.NewPasswordHash("hash"),
-			Email:        vo.NewEmailFromStored("john@example.com"),
-			Role:         "user",
-		}
-		h.reader.users["testuser"] = u
-		return u
-	}
-
 	t.Run("happy path", func(t *testing.T) {
 		h := newHarness()
-		u := seedUser(h)
+		u := seedUser(h, "testuser")
 		h.account.verify = true
 		h.account.tokens = port.TokenPair{AccessToken: "a", RefreshToken: "r"}
 
-		res, err := h.svc.Login(context.Background(), dto.LoginInput{Login: "testuser", Password: "password123"})
+		res, err := h.authSvc.Login(context.Background(), dto.LoginInput{Login: "testuser", Password: "password123"})
 		assert.NoError(t, err)
 		assert.Equal(t, "r", res.Tokens.RefreshToken)
-		assert.Equal(t, u.ID.String(), h.tokens.stored["r"]) // refresh-токен сохранён под id юзера
+		assert.Equal(t, u.ID.String(), h.tokens.stored["r"])
 	})
 
 	t.Run("empty credentials", func(t *testing.T) {
 		h := newHarness()
-		_, err := h.svc.Login(context.Background(), dto.LoginInput{Login: "  ", Password: ""})
+		_, err := h.authSvc.Login(context.Background(), dto.LoginInput{Login: "  ", Password: ""})
 		assert.ErrorIs(t, err, domain.ErrInvalidCredentials)
 	})
 
 	t.Run("unknown user maps to invalid credentials", func(t *testing.T) {
-		h := newHarness() 
-		_, err := h.svc.Login(context.Background(), dto.LoginInput{Login: "ghost", Password: "password123"})
+		h := newHarness()
+		_, err := h.authSvc.Login(context.Background(), dto.LoginInput{Login: "ghost", Password: "password123"})
 		assert.ErrorIs(t, err, domain.ErrInvalidCredentials)
 	})
 
 	t.Run("wrong password", func(t *testing.T) {
 		h := newHarness()
-		seedUser(h)
+		seedUser(h, "testuser")
 		h.account.verify = false
 
-		_, err := h.svc.Login(context.Background(), dto.LoginInput{Login: "testuser", Password: "wrong"})
+		_, err := h.authSvc.Login(context.Background(), dto.LoginInput{Login: "testuser", Password: "wrong"})
 		assert.ErrorIs(t, err, domain.ErrInvalidCredentials)
+	})
+
+	t.Run("blocked user", func(t *testing.T) {
+		h := newHarness()
+		u := seedUser(h, "testuser")
+		u.Status = vo.StatusBlocked
+		h.account.verify = true
+
+		_, err := h.authSvc.Login(context.Background(), dto.LoginInput{Login: "testuser", Password: "password123"})
+		assert.ErrorIs(t, err, domain.ErrUserBlocked)
+	})
+
+	t.Run("token store error", func(t *testing.T) {
+		h := newHarness()
+		seedUser(h, "testuser")
+		h.account.verify = true
+		h.account.tokens = port.TokenPair{AccessToken: "a", RefreshToken: "r"}
+		h.tokens.storeErr = errBoom
+
+		_, err := h.authSvc.Login(context.Background(), dto.LoginInput{Login: "testuser", Password: "password123"})
+		assert.ErrorIs(t, err, errBoom)
 	})
 }
 
 func TestAuthService_Logout(t *testing.T) {
 	t.Run("empty token", func(t *testing.T) {
 		h := newHarness()
-		err := h.svc.Logout(context.Background(), "  ")
+		err := h.authSvc.Logout(context.Background(), "  ")
 		assert.ErrorIs(t, err, domain.ErrInvalidInput)
 	})
 
@@ -296,8 +129,135 @@ func TestAuthService_Logout(t *testing.T) {
 		h := newHarness()
 		h.tokens.stored["r"] = "user-1"
 
-		err := h.svc.Logout(context.Background(), "r")
+		err := h.authSvc.Logout(context.Background(), "r")
 		assert.NoError(t, err)
 		assert.NotContains(t, h.tokens.stored, "r")
+	})
+}
+
+func TestAuthService_Refresh(t *testing.T) {
+	t.Run("empty token", func(t *testing.T) {
+		h := newHarness()
+		_, err := h.authSvc.Refresh(context.Background(), "  ")
+		assert.ErrorIs(t, err, domain.ErrInvalidInput)
+	})
+
+	t.Run("invalid token", func(t *testing.T) {
+		h := newHarness()
+		h.account.validateErr = domain.ErrInvalidToken
+		_, err := h.authSvc.Refresh(context.Background(), "bad-token")
+		assert.ErrorIs(t, err, domain.ErrInvalidToken)
+	})
+
+	t.Run("token not in store", func(t *testing.T) {
+		h := newHarness()
+		h.account.validateIdentity = model.Identity{UserID: uuid.New(), Role: "user"}
+		h.tokens.getUserErr = domain.ErrInvalidToken
+
+		_, err := h.authSvc.Refresh(context.Background(), "expired-token")
+		assert.ErrorIs(t, err, domain.ErrInvalidCredentials)
+	})
+
+	t.Run("happy path", func(t *testing.T) {
+		h := newHarness()
+		uid := uuid.New()
+		h.account.validateIdentity = model.Identity{UserID: uid, Role: "user"}
+		h.account.tokens = port.TokenPair{AccessToken: "new-a", RefreshToken: "new-r"}
+		h.tokens.stored["old-r"] = uid.String()
+
+		pair, err := h.authSvc.Refresh(context.Background(), "old-r")
+		assert.NoError(t, err)
+		assert.Equal(t, "new-r", pair.RefreshToken)
+		assert.NotContains(t, h.tokens.stored, "old-r")
+		assert.Equal(t, uid.String(), h.tokens.stored["new-r"])
+	})
+
+	t.Run("delete error", func(t *testing.T) {
+		h := newHarness()
+		h.account.validateIdentity = model.Identity{UserID: uuid.New(), Role: "user"}
+		h.tokens.stored["old-r"] = uuid.New().String()
+		h.tokens.deleteErr = errBoom
+
+		_, err := h.authSvc.Refresh(context.Background(), "old-r")
+		assert.ErrorIs(t, err, errBoom)
+	})
+
+	t.Run("generate error", func(t *testing.T) {
+		h := newHarness()
+		h.account.validateIdentity = model.Identity{UserID: uuid.New(), Role: "user"}
+		h.tokens.stored["old-r"] = uuid.New().String()
+		h.account.genErr = errBoom
+
+		_, err := h.authSvc.Refresh(context.Background(), "old-r")
+		assert.ErrorIs(t, err, errBoom)
+	})
+
+	t.Run("store error after generate", func(t *testing.T) {
+		h := newHarness()
+		h.account.validateIdentity = model.Identity{UserID: uuid.New(), Role: "user"}
+		h.account.tokens = port.TokenPair{AccessToken: "a", RefreshToken: "new-r"}
+		h.tokens.stored["old-r"] = uuid.New().String()
+		h.tokens.storeErr = errBoom
+
+		_, err := h.authSvc.Refresh(context.Background(), "old-r")
+		assert.ErrorIs(t, err, errBoom)
+	})
+}
+
+func TestAuthService_Me(t *testing.T) {
+	t.Run("empty token", func(t *testing.T) {
+		h := newHarness()
+		_, err := h.authSvc.Me(context.Background(), "  ")
+		assert.ErrorIs(t, err, domain.ErrInvalidToken)
+	})
+
+	t.Run("invalid token", func(t *testing.T) {
+		h := newHarness()
+		h.account.validateErr = domain.ErrInvalidToken
+		_, err := h.authSvc.Me(context.Background(), "bad")
+		assert.ErrorIs(t, err, domain.ErrInvalidToken)
+	})
+
+	t.Run("user not found", func(t *testing.T) {
+		h := newHarness()
+		h.account.validateIdentity = model.Identity{UserID: uuid.New(), Role: "user"}
+		_, err := h.authSvc.Me(context.Background(), "token")
+		assert.ErrorIs(t, err, domain.ErrUserNotFound)
+	})
+
+	t.Run("blocked user", func(t *testing.T) {
+		h := newHarness()
+		uid := uuid.New()
+		h.account.validateIdentity = model.Identity{UserID: uid, Role: "user"}
+		u := &model.User{
+			ID:     uid,
+			Status: vo.StatusBlocked,
+			Role:   vo.RoleUser,
+			Login:  vo.NewLoginFromStored("blocked"),
+			Email:  vo.NewEmailFromStored("b@x.com"),
+		}
+		h.repo.byID[uid] = u
+
+		_, err := h.authSvc.Me(context.Background(), "token")
+		assert.ErrorIs(t, err, domain.ErrUserBlocked)
+	})
+
+	t.Run("happy path", func(t *testing.T) {
+		h := newHarness()
+		uid := uuid.New()
+		h.account.validateIdentity = model.Identity{UserID: uid, Role: "admin"}
+		u := &model.User{
+			ID:     uid,
+			Status: vo.StatusActive,
+			Role:   vo.RoleAdmin,
+			Login:  vo.NewLoginFromStored("admin"),
+			Email:  vo.NewEmailFromStored("a@x.com"),
+		}
+		h.repo.byID[uid] = u
+
+		me, err := h.authSvc.Me(context.Background(), "token")
+		assert.NoError(t, err)
+		assert.Equal(t, uid.String(), me.UserID)
+		assert.Equal(t, "admin", me.Role)
 	})
 }

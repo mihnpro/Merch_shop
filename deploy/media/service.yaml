@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: media
+  namespace: merchshop
+  labels:
+    app: media
+spec:
+  type: ClusterIP
+  selector:
+    app: media
+  ports:
+    - name: http
+      port: 8083
+      targetPort: 8083
+    - name: grpc
+      port: 50051
+      targetPort: 50051
