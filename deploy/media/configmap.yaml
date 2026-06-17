@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: media-config
+  namespace: merchshop
+  labels:
+    app: media
+data:
+  HTTP_PORT: "8083"
+  GRPC_PORT: "50051"
+  MINIO_ENDPOINT: "host.minikube.internal:9000"
+  MINIO_BUCKET: "merch-products"
+  MINIO_USE_SSL: "false"
