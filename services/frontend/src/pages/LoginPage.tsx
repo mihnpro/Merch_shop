@@ -35,12 +35,25 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="card">
-      <h1>Вход</h1>
-      {justRegistered && (
-        <p className="info">Регистрация прошла успешно — теперь войдите.</p>
-      )}
-      <form onSubmit={handleSubmit}>
+    <div className="auth-screen">
+      <aside className="auth-hero">
+        <div className="auth-hero-logo">MerchShop</div>
+        <p className="auth-hero-tagline">
+          Магазин фирменного мерча. Стиль, который говорит за тебя.
+        </p>
+        <ul className="auth-hero-points">
+          <li>Свежие дропы и лимитированные коллекции</li>
+          <li>Баллы за покупки и бонусы</li>
+          <li>Отслеживание заказа в реальном времени</li>
+        </ul>
+      </aside>
+      <div className="auth-form-side">
+        <div className="card">
+          <h1>Вход</h1>
+          {justRegistered && (
+            <p className="info">Регистрация прошла успешно — теперь войдите.</p>
+          )}
+          <form onSubmit={handleSubmit}>
         <label>
           Логин
           <input
@@ -61,14 +74,16 @@ export default function LoginPage() {
 
         {error && <p className="error">{error}</p>}
 
-        <button type="submit" disabled={loading}>
-          {loading ? "Входим…" : "Войти"}
-        </button>
-      </form>
+            <button type="submit" disabled={loading}>
+              {loading ? "Входим…" : "Войти"}
+            </button>
+          </form>
 
-      <p className="hint">
-        Нет аккаунта? <Link to="/register">Зарегистрироваться</Link>
-      </p>
+          <p className="hint">
+            Нет аккаунта? <Link to="/register">Зарегистрироваться</Link>
+          </p>
+        </div>
+      </div>
     </div>
   );
 }
