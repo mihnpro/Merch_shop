@@ -53,9 +53,22 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="card">
-      <h1>Регистрация</h1>
-      <form onSubmit={handleSubmit}>
+    <div className="auth-screen">
+      <aside className="auth-hero">
+        <div className="auth-hero-logo">MerchShop</div>
+        <p className="auth-hero-tagline">
+          Создай аккаунт и присоединяйся к комьюнити.
+        </p>
+        <ul className="auth-hero-points">
+          <li>Персональная лента товаров</li>
+          <li>Баллы и бонусы с первой покупки</li>
+          <li>Быстрое оформление и доставка</li>
+        </ul>
+      </aside>
+      <div className="auth-form-side">
+        <div className="card">
+          <h1>Регистрация</h1>
+          <form onSubmit={handleSubmit}>
         <label>
           Логин
           <input name="login" value={form.login} onChange={handleChange} required />
@@ -105,14 +118,16 @@ export default function RegisterPage() {
 
         {error && <p className="error">{error}</p>}
 
-        <button type="submit" disabled={loading}>
-          {loading ? "Регистрируем…" : "Зарегистрироваться"}
-        </button>
-      </form>
+            <button type="submit" disabled={loading}>
+              {loading ? "Регистрируем…" : "Зарегистрироваться"}
+            </button>
+          </form>
 
-      <p className="hint">
-        Уже есть аккаунт? <Link to="/login">Войти</Link>
-      </p>
+          <p className="hint">
+            Уже есть аккаунт? <Link to="/login">Войти</Link>
+          </p>
+        </div>
+      </div>
     </div>
   );
 }
